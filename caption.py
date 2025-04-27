@@ -1,7 +1,7 @@
 import base64
 import io
 import os
-from openai import OpenAI
+from together import Together
 from PIL import Image
 from dotenv import load_dotenv
 
@@ -41,7 +41,7 @@ Captioning Principles:
 - Avoid mentioning real or fictional identities.
 - Always prefix with the trigger word "tr1gger."
 
-Updated Examples:
+Examples:
 - tr1gger photorealistic, tactical vest and gloves, standing in profile, neutral expression, overcast lighting, side profile
 - tr1gger 3D-rendered, hooded cloak with digital pattern, seated cross-legged, calm expression, low ambient lighting, front view
 - tr1gger anime-style, school uniform with blue necktie, standing with arms behind back, gentle smile, soft daylight, three-quarter view
@@ -57,7 +57,13 @@ def caption_images(images):
         img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
         image_strings.append(img_str)
     
-    client = OpenAI()
+    # Retrieve the API key from the environment
+    api_key = os.environ.get("TOGETHER_API_KEY")
+    if not api_key:
+        raise ValueError("TOGETHER_API_KEY is not set in the environment.")
+
+    # Pass the API key to the Together client
+    client = Together(api_key=api_key)
     captions = []
 
     # Start a separate chat session for each image
@@ -65,31 +71,40 @@ def caption_images(images):
         messages = [
             {"role": "system", "content": get_prompt()},
             {
-                "role": "user", 
+                "role": "user",
                 "content": [
-                    {"type": "text", "text": "Caption this image according to the guidelines."},
-                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}}
+                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}},
+                    {"type": "text", "text": "Describe this image."}
                 ]
             }
         ]
         
-        # Request caption for the image in a single chat
+        # Request caption for the image using Llama 4 Maverick
         response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=messages,
-            max_tokens=512  # Adjust max_tokens as needed
+            model="meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
+            messages=messages
         )
         
         # Extract caption from the response
-        caption = response.choices[0].message.content.strip()
+        full_response = response.choices[0].message.content.strip()
+        # Post-process to extract only the caption part
+        caption = next((line for line in full_response.splitlines() if line.startswith("tr1gger")), "")
         captions.append(caption)
     
     return captions
 
+def extract_captions(file_path):
+    captions = []
+    with open(file_path, 'r') as file:
+        for line in file:
+            if line.startswith("tr1gger"):
+                captions.append(line.strip())
+    return captions
+
 # Example usage
 if __name__ == "__main__":
-    if not os.environ.get("OPENAI_API_KEY"):
-        print("Please update the .env file with your OpenAI API key.")
+    if not os.environ.get("TOGETHER_API_KEY"):
+        print("Please update the environment with your Together AI API key.")
         exit(1)
 
     # Load images
@@ -100,3 +115,9 @@ if __name__ == "__main__":
     captions = caption_images(images)
     for i, caption in enumerate(captions):
         print(f"Generated Caption for Image {i+1}: {caption}")
+
+    # Extract captions from a file
+    file_path = 'post_girl/multiview_0.txt'
+    extracted_captions = extract_captions(file_path)
+    for caption in extracted_captions:
+        print(caption)
