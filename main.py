@@ -50,7 +50,7 @@ def validate_input_directory(input_dir):
             print(f"  - {file}")
         sys.exit(1)
 
-def process_images(input_dir, output_dir, fix_outfit=False):
+def process_images(input_dir, output_dir, fix_outfit=False, batch_images=False):
     """Process all images in the input directory and generate captions."""
     input_path = Path(input_dir)
     output_path = Path(output_dir) if output_dir else input_path
@@ -64,9 +64,9 @@ def process_images(input_dir, output_dir, fix_outfit=False):
     # Track the number of processed images
     processed_count = 0
     
-    # Collect all images into a list
-    images = []
-    image_paths = []
+    # Collect all images into a dictionary grouped by category
+    images_by_category = {}
+    image_paths_by_category = {}
 
     # Get all files in the input directory
     for file_path in input_path.iterdir():
@@ -74,26 +74,54 @@ def process_images(input_dir, output_dir, fix_outfit=False):
             try:
                 # Load the image
                 image = Image.open(file_path).convert("RGB")
-                images.append(image)
-                image_paths.append(file_path)
+                
+                # Determine the category from the filename
+                category = file_path.stem.rsplit('_', 1)[0]
+                
+                # Add image to the appropriate category
+                if category not in images_by_category:
+                    images_by_category[category] = []
+                    image_paths_by_category[category] = []
+                
+                images_by_category[category].append(image)
+                image_paths_by_category[category].append(file_path)
             except Exception as e:
                 print(f"Error loading {file_path.name}: {e}")
 
     # Log the number of images found
-    print(f"Found {len(images)} images to process.")
+    total_images = sum(len(images) for images in images_by_category.values())
+    print(f"Found {total_images} images to process.")
 
-    if not images:
+    if not total_images:
         print("No valid images found to process.")
         return
 
-    # Generate captions for all images
-    try:
-        captions = caption_images(images)
-    except Exception as e:
-        print(f"Error generating captions: {e}")
-        return
+    # Process images by category if batch_images is True
+    if batch_images:
+        for category, images in images_by_category.items():
+            image_paths = image_paths_by_category[category]
+            try:
+                # Generate captions for the entire category
+                captions = caption_images(images)
+                write_captions(image_paths, captions, input_path, output_path)
+                processed_count += len(images)
+            except Exception as e:
+                print(f"Error generating captions for category '{category}': {e}")
+    else:
+        # Process all images at once if batch_images is False
+        all_images = [img for imgs in images_by_category.values() for img in imgs]
+        all_image_paths = [path for paths in image_paths_by_category.values() for path in paths]
+        try:
+            captions = caption_images(all_images)
+            write_captions(all_image_paths, captions, input_path, output_path)
+            processed_count += len(all_images)
+        except Exception as e:
+            print(f"Error generating captions: {e}")
 
-    # Write captions to files
+    print(f"\nProcessing complete. {processed_count} images were captioned.")
+
+def write_captions(image_paths, captions, input_path, output_path):
+    """Helper function to write captions to files."""
     for file_path, caption in zip(image_paths, captions):
         try:
             # Create caption file path (same name but with .txt extension)
@@ -111,18 +139,16 @@ def process_images(input_dir, output_dir, fix_outfit=False):
                 # Copy caption to output directory
                 shutil.copy2(caption_path, output_path / caption_filename)
 
-            processed_count += 1
             print(f"Processed {file_path.name} → {caption_filename}")
         except Exception as e:
             print(f"Error processing {file_path.name}: {e}")
-
-    print(f"\nProcessing complete. {processed_count} images were captioned.")
 
 def main():
     parser = argparse.ArgumentParser(description='Generate captions for images using GPT-4o.')
     parser.add_argument('--input', type=str, required=True, help='Directory containing images')
     parser.add_argument('--output', type=str, help='Directory to save images and captions (defaults to input directory)')
     parser.add_argument('--fix_outfit', action='store_true', help='Flag to indicate if character has one outfit')
+    parser.add_argument('--batch_images', action='store_true', help='Flag to indicate if images should be processed in batches')
     
     args = parser.parse_args()
     
@@ -132,7 +158,7 @@ def main():
         return
     
     # Process images
-    process_images(args.input, args.output, args.fix_outfit)
+    process_images(args.input, args.output, args.fix_outfit, args.batch_images)
 
 if __name__ == "__main__":
     main() 
