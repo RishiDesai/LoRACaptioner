@@ -10,7 +10,15 @@ load_dotenv()
 def get_prompt():
     return """Automated Image Captioning (for LoRA Training)
 
-Role: You are an expert AI captioning system generating precise, structured descriptions for AI-generated character images optimized for LoRA model training in Stable Diffusion and Flux.1-dev.
+Role: You are an expert AI captioning system generating precise, structured descriptions for character images optimized for LoRA model training in Stable Diffusion and Flux.1-dev.
+
+IMPORTANT: You MUST follow these rules EXACTLY:
+1. EVERY caption MUST start with the word "tr1gger" (exactly like this, no variations)
+2. You MUST use the exact format: tr1gger [Style], [Notable Visual Features], [Clothing], [Pose], [Expression], [Lighting], [Camera Angle]
+3. DO NOT include any additional text, explanations, or formatting
+4. DO NOT use bullet points, lists, or any other formatting
+5. DO NOT include any text before or after the caption
+6. If you don't follow this format exactly, the caption will be rejected
 
 General Guidelines:
 1. Prioritize Consistency – Maintain uniform descriptions across all images in a dataset. Avoid introducing variation in features that should remain constant (e.g., fixed traits like eye color, hair color, or markings that are inherently part of the concept and handled during model training).
@@ -28,8 +36,8 @@ Avoid Describing These Unless Variable Across Dataset or Uncertain from Concept:
 - Tattoos or markings if core to the concept
 - Known accessories that always appear (unless outfit-specific)
 
-Updated Caption Format:  
-tr1gger [Style], [Notable Visual Features], [Clothing], [Pose], [Expression], [Lighting], [Camera Angle]
+Caption Format (MUST FOLLOW EXACTLY):  
+tr1gger [Style], [Notable Visual Features], [Clothing], [Pose], [Expression/Mood], [Background/Setting], [Lighting], [Camera Angle]
 
 Captioning Principles:
 - Emphasize visual variation and context-specific details (outfit, pose, lighting, expression, camera angle).
@@ -41,14 +49,20 @@ Captioning Principles:
 - Avoid mentioning real or fictional identities.
 - Always prefix with the trigger word "tr1gger."
 
-Examples:
-- tr1gger photorealistic, tactical vest and gloves, standing in profile, neutral expression, overcast lighting, side profile
-- tr1gger 3D-rendered, hooded cloak with digital pattern, seated cross-legged, calm expression, low ambient lighting, front view
-- tr1gger anime-style, school uniform with blue necktie, standing with arms behind back, gentle smile, soft daylight, three-quarter view
-- tr1gger photorealistic, long trench coat and combat boots, walking through rain-soaked street, determined expression, dramatic shadows, low-angle view
+Examples (MUST FOLLOW THIS EXACT FORMAT):
+tr1gger photorealistic, combat gear, tactical vest and gloves, standing in profile, neutral, empty room, overcast lighting, side profile
+tr1gger 3D-rendered, digital patterns, hooded cloak, seated cross-legged, calm, meditation chamber, low ambient lighting, front view
+tr1gger anime-style, school uniform with blue necktie, standing with arms behind back, gentle smile, classroom, soft daylight, three-quarter view
+tr1gger photorealistic, long trench coat and combat boots, walking, determined, rain-soaked street, dramatic shadows, low-angle view
+
+REMEMBER: Your response must be a single line starting with "tr1gger" and following the exact format above. No additional text, formatting, or explanations are allowed.
 """
 
-def caption_images(images):
+class CaptioningError(Exception):
+    """Exception raised for errors in the captioning process."""
+    pass
+
+def caption_images(images, category=None, batch_mode=False):
     # Convert PIL images to base64 encoded strings
     image_strings = []
     for image in images:
@@ -66,30 +80,103 @@ def caption_images(images):
     client = Together(api_key=api_key)
     captions = []
 
-    # Start a separate chat session for each image
-    for img_str in image_strings:
+    # If batch_mode is True, process all images in a single API call
+    if batch_mode and category:
+        # Create a content array with all images
+        content = [{"type": "text", "text": f"Here is the batch of images for {category}. Please caption each image on a separate line, starting each caption with 'tr1gger'."}]
+        
+        # Add all images to the content array
+        for i, img_str in enumerate(image_strings):
+            content.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}})
+            content.append({"type": "text", "text": f"Image {i+1}"})
+        
+        # Send the batch request
         messages = [
             {"role": "system", "content": get_prompt()},
-            {
-                "role": "user",
-                "content": [
-                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}},
-                    {"type": "text", "text": "Describe this image."}
-                ]
-            }
+            {"role": "user", "content": content}
         ]
         
-        # Request caption for the image using Llama 4 Maverick
         response = client.chat.completions.create(
             model="meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
             messages=messages
         )
         
-        # Extract caption from the response
+        # Parse the response to extract captions for each image
         full_response = response.choices[0].message.content.strip()
-        # Post-process to extract only the caption part
-        caption = next((line for line in full_response.splitlines() if line.startswith("tr1gger")), "")
-        captions.append(caption)
+        lines = full_response.splitlines()
+        
+        # Extract captions from the response
+        image_count = len(image_strings)
+        captions = [""] * image_count  # Initialize with empty strings
+        
+        # Extract lines that start with or contain "tr1gger"
+        tr1gger_lines = [line for line in lines if "tr1gger" in line]
+        
+        # Assign captions to images
+        for i in range(image_count):
+            if i < len(tr1gger_lines):
+                caption = tr1gger_lines[i]
+                # If caption contains but doesn't start with tr1gger, extract just that part
+                if not caption.startswith("tr1gger") and "tr1gger" in caption:
+                    caption = caption[caption.index("tr1gger"):]
+                captions[i] = caption
+        
+        # Check if all captions are empty or don't contain the trigger word
+        valid_captions = [c for c in captions if c and "tr1gger" in c]
+        if not valid_captions:
+            error_msg = "Failed to parse any valid captions from batch response. Response contained no lines with 'tr1gger'"
+            error_msg += f"\n\nActual response:\n{full_response}"
+            raise CaptioningError(error_msg)
+        
+        # Check if some captions are missing
+        if len(valid_captions) < len(images):
+            missing_count = len(images) - len(valid_captions)
+            invalid_captions = [(i, c) for i, c in enumerate(captions) if not c or "tr1gger" not in c]
+            error_msg = f"Failed to parse captions for {missing_count} of {len(images)} images in batch mode"
+            error_msg += "\n\nMalformed captions:"
+            for idx, caption in invalid_captions:
+                error_msg += f"\nImage {idx+1}: '{caption}'"
+            raise CaptioningError(error_msg)
+    else:
+        # Original method: process each image separately
+        for img_str in image_strings:
+            messages = [
+                {"role": "system", "content": get_prompt()},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}},
+                        {"type": "text", "text": "Describe this image."}
+                    ]
+                }
+            ]
+            
+            # Request caption for the image using Llama 4 Maverick
+            response = client.chat.completions.create(
+                model="meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
+                messages=messages
+            )
+            
+            # Extract caption from the response
+            full_response = response.choices[0].message.content.strip()
+            # Post-process to extract only the caption part
+            caption = ""
+            for line in full_response.splitlines():
+                if "tr1gger" in line:
+                    # If caption has a numbered prefix, extract just the caption part
+                    if not line.startswith("tr1gger"):
+                        caption = line[line.index("tr1gger"):]
+                    else:
+                        caption = line
+                    break
+            
+            # Check if caption is valid
+            if not caption:
+                error_msg = "Failed to extract a valid caption (containing 'tr1gger') from the response"
+                error_msg += f"\n\nActual response:\n{full_response}"
+                raise CaptioningError(error_msg)
+                
+            captions.append(caption)
     
     return captions
 
@@ -100,24 +187,3 @@ def extract_captions(file_path):
             if line.startswith("tr1gger"):
                 captions.append(line.strip())
     return captions
-
-# Example usage
-if __name__ == "__main__":
-    if not os.environ.get("TOGETHER_API_KEY"):
-        print("Please update the environment with your Together AI API key.")
-        exit(1)
-
-    # Load images
-    image_paths = ['input/daenyrs_hd.jpg', 'input/girl_body.png']
-    images = [Image.open(path).convert("RGB") for path in image_paths]
-
-    # Generate captions
-    captions = caption_images(images)
-    for i, caption in enumerate(captions):
-        print(f"Generated Caption for Image {i+1}: {caption}")
-
-    # Extract captions from a file
-    file_path = 'post_girl/multiview_0.txt'
-    extracted_captions = extract_captions(file_path)
-    for caption in extracted_captions:
-        print(caption)

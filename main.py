@@ -43,32 +43,16 @@ def validate_input_directory(input_dir):
         sys.exit(1)
     
     if text_files:
-        print("Error: Text files detected in the input directory.")
-        print("The input directory should only contain image files to prevent overwriting existing text files.")
-        print("The following text files were found:")
+        print("Warning: Text files detected in the input directory.")
+        print("The following text files will be overwritten:")
         for file in text_files:
             print(f"  - {file}")
-        sys.exit(1)
 
-def process_images(input_dir, output_dir, fix_outfit=False, batch_images=False):
-    """Process all images in the input directory and generate captions."""
-    input_path = Path(input_dir)
-    output_path = Path(output_dir) if output_dir else input_path
-    
-    # Validate the input directory first
-    validate_input_directory(input_dir)
-    
-    # Create output directory if it doesn't exist
-    os.makedirs(output_path, exist_ok=True)
-    
-    # Track the number of processed images
-    processed_count = 0
-    
-    # Collect all images into a dictionary grouped by category
+def collect_images_by_category(input_path):
+    """Collect all valid images and group them by category."""
     images_by_category = {}
     image_paths_by_category = {}
 
-    # Get all files in the input directory
     for file_path in input_path.iterdir():
         if file_path.is_file() and is_image_file(file_path.name):
             try:
@@ -87,6 +71,53 @@ def process_images(input_dir, output_dir, fix_outfit=False, batch_images=False):
                 image_paths_by_category[category].append(file_path)
             except Exception as e:
                 print(f"Error loading {file_path.name}: {e}")
+    
+    return images_by_category, image_paths_by_category
+
+def process_by_category(images_by_category, image_paths_by_category, input_path, output_path):
+    """Process images in batches by category."""
+    processed_count = 0
+    
+    for category, images in images_by_category.items():
+        image_paths = image_paths_by_category[category]
+        try:
+            # Generate captions for the entire category using batch mode
+            captions = caption_images(images, category=category, batch_mode=True)
+            write_captions(image_paths, captions, input_path, output_path)
+            processed_count += len(images)
+        except Exception as e:
+            print(f"Error generating captions for category '{category}': {e}")
+    
+    return processed_count
+
+def process_all_at_once(images_by_category, image_paths_by_category, input_path, output_path):
+    """Process all images at once."""
+    all_images = [img for imgs in images_by_category.values() for img in imgs]
+    all_image_paths = [path for paths in image_paths_by_category.values() for path in paths]
+    processed_count = 0
+    
+    try:
+        captions = caption_images(all_images, batch_mode=False)
+        write_captions(all_image_paths, captions, input_path, output_path)
+        processed_count += len(all_images)
+    except Exception as e:
+        print(f"Error generating captions: {e}")
+    
+    return processed_count
+
+def process_images(input_dir, output_dir, fix_outfit=False, batch_images=False):
+    """Process all images in the input directory and generate captions."""
+    input_path = Path(input_dir)
+    output_path = Path(output_dir) if output_dir else input_path
+    
+    # Validate the input directory first
+    validate_input_directory(input_dir)
+    
+    # Create output directory if it doesn't exist
+    os.makedirs(output_path, exist_ok=True)
+    
+    # Collect images by category
+    images_by_category, image_paths_by_category = collect_images_by_category(input_path)
 
     # Log the number of images found
     total_images = sum(len(images) for images in images_by_category.values())
@@ -96,27 +127,11 @@ def process_images(input_dir, output_dir, fix_outfit=False, batch_images=False):
         print("No valid images found to process.")
         return
 
-    # Process images by category if batch_images is True
+    # Process images based on batch setting
     if batch_images:
-        for category, images in images_by_category.items():
-            image_paths = image_paths_by_category[category]
-            try:
-                # Generate captions for the entire category
-                captions = caption_images(images)
-                write_captions(image_paths, captions, input_path, output_path)
-                processed_count += len(images)
-            except Exception as e:
-                print(f"Error generating captions for category '{category}': {e}")
+        processed_count = process_by_category(images_by_category, image_paths_by_category, input_path, output_path)
     else:
-        # Process all images at once if batch_images is False
-        all_images = [img for imgs in images_by_category.values() for img in imgs]
-        all_image_paths = [path for paths in image_paths_by_category.values() for path in paths]
-        try:
-            captions = caption_images(all_images)
-            write_captions(all_image_paths, captions, input_path, output_path)
-            processed_count += len(all_images)
-        except Exception as e:
-            print(f"Error generating captions: {e}")
+        processed_count = process_all_at_once(images_by_category, image_paths_by_category, input_path, output_path)
 
     print(f"\nProcessing complete. {processed_count} images were captioned.")
 

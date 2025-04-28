@@ -1,0 +1,5 @@
+gradio==4.44.1
+Pillow==10.0.0
+pydantic>=2.0.0
+together
+fastapi>=0.100.0
