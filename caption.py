@@ -3,6 +3,7 @@ import io
 import os
 from together import Together
 
+TRIGGER_WORD = "tr1gger"
 
 def get_system_prompt():
     return """Automated Image Captioning (for LoRA Training)
@@ -10,9 +11,8 @@ def get_system_prompt():
 Role: You are an expert AI captioning system generating precise, structured descriptions for character images optimized for LoRA model training in Stable Diffusion and Flux.1-dev.
 
 IMPORTANT: You MUST follow these rules EXACTLY:
-1. EVERY caption MUST start with the word "tr1gger" (exactly like this, no variations)
-2. You MUST use the exact format: tr1gger [Style], [Notable Visual Features], [Clothing], [Pose], [Expression], [Lighting], [Camera Angle]
-3. DO NOT include any additional text, explanations, or formatting
+1. EVERY caption MUST start with the word "{TRIGGER_WORD}" (exactly like this, no variations)
+2. You MUST use the exact format: {TRIGGER_WORD} [Style], [Notable Visual Features], [Clothing], [Pose], [Expression/Mood], [Background/Setting], [Lighting], [Camera Angle]
 4. DO NOT use bullet points, lists, or any other formatting
 5. DO NOT include any text before or after the caption
 6. If you don't follow this format exactly, the caption will be rejected
@@ -34,7 +34,7 @@ Avoid Describing These Unless Variable Across Dataset or Uncertain from Concept:
 - Known accessories that always appear (unless outfit-specific)
 
 Caption Format (MUST FOLLOW EXACTLY):  
-tr1gger [Style], [Notable Visual Features], [Clothing], [Pose], [Expression/Mood], [Background/Setting], [Lighting], [Camera Angle]
+{TRIGGER_WORD} [Style], [Notable Visual Features], [Clothing], [Pose], [Expression/Mood], [Background/Setting], [Lighting], [Camera Angle]
 
 Captioning Principles:
 - Emphasize visual variation and context-specific details (outfit, pose, lighting, expression, camera angle).
@@ -44,15 +44,15 @@ Captioning Principles:
 - Specify lighting conditions (soft lighting, harsh shadows, glowing backlight).
 - Explicitly state camera angle (e.g., front view, right side profile, low-angle, high-angle, overhead).
 - Avoid mentioning real or fictional identities.
-- Always prefix with the trigger word "tr1gger."
+- Always prefix with the trigger word "{TRIGGER_WORD}."
 
 Examples (MUST FOLLOW THIS EXACT FORMAT):
-tr1gger photorealistic, combat gear, tactical vest and gloves, standing in profile, neutral, empty room, overcast lighting, side profile
-tr1gger 3D-rendered, digital patterns, hooded cloak, seated cross-legged, calm, meditation chamber, low ambient lighting, front view
-tr1gger anime-style, school uniform with blue necktie, standing with arms behind back, gentle smile, classroom, soft daylight, three-quarter view
-tr1gger photorealistic, long trench coat and combat boots, walking, determined, rain-soaked street, dramatic shadows, low-angle view
+{TRIGGER_WORD} photorealistic, combat gear, tactical vest and gloves, standing in profile, neutral, empty room, overcast lighting, side profile
+{TRIGGER_WORD} 3D-rendered, digital patterns, hooded cloak, seated cross-legged, calm, meditation chamber, low ambient lighting, front view
+{TRIGGER_WORD} anime-style, school uniform with blue necktie, standing with arms behind back, gentle smile, classroom, soft daylight, three-quarter view
+{TRIGGER_WORD} photorealistic, long trench coat and combat boots, walking, determined, rain-soaked street, dramatic shadows, low-angle view
 
-REMEMBER: Your response must be a single line starting with "tr1gger" and following the exact format above. No additional text, formatting, or explanations are allowed.
+REMEMBER: Your response must be a single line starting with "{TRIGGER_WORD}" and following the exact format above. No additional text, formatting, or explanations are allowed.
 """
 
 
@@ -82,10 +82,10 @@ def get_together_client():
 
 def extract_caption(line):
     """Extract caption from a line of text."""
-    if "tr1gger" in line:
-        # If caption doesn't start with tr1gger but contains it, extract just that part
-        if not line.startswith("tr1gger"):
-            return line[line.index("tr1gger"):]
+    if TRIGGER_WORD in line:
+        # If caption doesn't start with trigger_word but contains it, extract just that part
+        if not line.startswith(TRIGGER_WORD):
+            return line[line.index(TRIGGER_WORD):]
         return line
     return ""
 
@@ -117,7 +117,7 @@ def caption_single_image(client, img_str):
             break
 
     if not caption:
-        error_msg = "Failed to extract a valid caption (containing 'tr1gger') from the response"
+        error_msg = f"Failed to extract a valid caption (containing '{TRIGGER_WORD}') from the response"
         error_msg += f"\n\nActual response:\n{full_response}"
         raise CaptioningError(error_msg)
 
@@ -155,8 +155,8 @@ def process_batch_response(response, image_strings):
     image_count = len(image_strings)
     captions = [""] * image_count
 
-    # Extract lines that start with or contain "tr1gger"
-    caption_lines = [line for line in lines if "tr1gger" in line]
+    # Extract lines that start with or contain trigger_word
+    caption_lines = [line for line in lines if TRIGGER_WORD in line]
 
     # Assign captions to images
     for i in range(image_count):
@@ -171,7 +171,7 @@ def process_batch_response(response, image_strings):
 def validate_batch_captions(captions, image_count, full_response):
     """Validate captions extracted from a batch response."""
     # Check if all captions are empty or don't contain the trigger word
-    valid_captions = [c for c in captions if c and "tr1gger" in c]
+    valid_captions = [c for c in captions if c and TRIGGER_WORD in c]
     if not valid_captions:
         error_msg = "Failed to parse any valid captions from batch response."
         error_msg += f"\n\nActual response:\n{full_response}"
@@ -180,7 +180,7 @@ def validate_batch_captions(captions, image_count, full_response):
     # Check if some captions are missing
     if len(valid_captions) < image_count:
         missing_count = image_count - len(valid_captions)
-        invalid_captions = [(i, c) for i, c in enumerate(captions) if not c or "tr1gger" not in c]
+        invalid_captions = [(i, c) for i, c in enumerate(captions) if not c or TRIGGER_WORD not in c]
         error_msg = f"Failed to parse captions for {missing_count} of {image_count} images in batch mode"
         error_msg += "\n\nMalformed captions:"
         for idx, caption in invalid_captions:
@@ -204,6 +204,6 @@ def extract_captions(file_path):
     captions = []
     with open(file_path, 'r') as file:
         for line in file:
-            if line.startswith("tr1gger"):
+            if line.startswith(TRIGGER_WORD):
                 captions.append(line.strip())
     return captions
