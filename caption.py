@@ -62,123 +62,147 @@ class CaptioningError(Exception):
     """Exception raised for errors in the captioning process."""
     pass
 
-def caption_images(images, category=None, batch_mode=False):
-    # Convert PIL images to base64 encoded strings
+def images_to_base64(images):
+    """Convert a list of PIL images to base64 encoded strings."""
     image_strings = []
     for image in images:
         buffered = io.BytesIO()
         image.save(buffered, format="PNG")
         img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
         image_strings.append(img_str)
-    
-    # Retrieve the API key from the environment
+    return image_strings
+
+def get_together_client():
+    """Initialize and return the Together API client."""
     api_key = os.environ.get("TOGETHER_API_KEY")
     if not api_key:
         raise ValueError("TOGETHER_API_KEY is not set in the environment.")
+    return Together(api_key=api_key)
 
-    # Pass the API key to the Together client
-    client = Together(api_key=api_key)
-    captions = []
+def extract_trigger_caption(line):
+    """Extract 'tr1gger' caption from a line of text."""
+    if "tr1gger" in line:
+        # If caption doesn't start with tr1gger but contains it, extract just that part
+        if not line.startswith("tr1gger"):
+            return line[line.index("tr1gger"):]
+        return line
+    return ""
 
-    # If batch_mode is True, process all images in a single API call
-    if batch_mode and category:
-        # Create a content array with all images
-        content = [{"type": "text", "text": f"Here is the batch of images for {category}. Please caption each image on a separate line, starting each caption with 'tr1gger'."}]
-        
-        # Add all images to the content array
-        for i, img_str in enumerate(image_strings):
-            content.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}})
-            content.append({"type": "text", "text": f"Image {i+1}"})
-        
-        # Send the batch request
-        messages = [
-            {"role": "system", "content": get_prompt()},
-            {"role": "user", "content": content}
-        ]
-        
-        response = client.chat.completions.create(
-            model="meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
-            messages=messages
-        )
-        
-        # Parse the response to extract captions for each image
-        full_response = response.choices[0].message.content.strip()
-        lines = full_response.splitlines()
-        
-        # Extract captions from the response
-        image_count = len(image_strings)
-        captions = [""] * image_count  # Initialize with empty strings
-        
-        # Extract lines that start with or contain "tr1gger"
-        tr1gger_lines = [line for line in lines if "tr1gger" in line]
-        
-        # Assign captions to images
-        for i in range(image_count):
-            if i < len(tr1gger_lines):
-                caption = tr1gger_lines[i]
-                # If caption contains but doesn't start with tr1gger, extract just that part
-                if not caption.startswith("tr1gger") and "tr1gger" in caption:
-                    caption = caption[caption.index("tr1gger"):]
-                captions[i] = caption
-        
-        # Check if all captions are empty or don't contain the trigger word
-        valid_captions = [c for c in captions if c and "tr1gger" in c]
-        if not valid_captions:
-            error_msg = "Failed to parse any valid captions from batch response. Response contained no lines with 'tr1gger'"
-            error_msg += f"\n\nActual response:\n{full_response}"
-            raise CaptioningError(error_msg)
-        
-        # Check if some captions are missing
-        if len(valid_captions) < len(images):
-            missing_count = len(images) - len(valid_captions)
-            invalid_captions = [(i, c) for i, c in enumerate(captions) if not c or "tr1gger" not in c]
-            error_msg = f"Failed to parse captions for {missing_count} of {len(images)} images in batch mode"
-            error_msg += "\n\nMalformed captions:"
-            for idx, caption in invalid_captions:
-                error_msg += f"\nImage {idx+1}: '{caption}'"
-            raise CaptioningError(error_msg)
-    else:
-        # Original method: process each image separately
-        for img_str in image_strings:
-            messages = [
-                {"role": "system", "content": get_prompt()},
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}},
-                        {"type": "text", "text": "Describe this image."}
-                    ]
-                }
+def caption_single_image(client, img_str):
+    """Process and caption a single image."""
+    messages = [
+        {"role": "system", "content": get_prompt()},
+        {
+            "role": "user",
+            "content": [
+                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}},
+                {"type": "text", "text": "Caption this image."}
             ]
-            
-            # Request caption for the image using Llama 4 Maverick
-            response = client.chat.completions.create(
-                model="meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
-                messages=messages
-            )
-            
-            # Extract caption from the response
-            full_response = response.choices[0].message.content.strip()
-            # Post-process to extract only the caption part
-            caption = ""
-            for line in full_response.splitlines():
-                if "tr1gger" in line:
-                    # If caption has a numbered prefix, extract just the caption part
-                    if not line.startswith("tr1gger"):
-                        caption = line[line.index("tr1gger"):]
-                    else:
-                        caption = line
-                    break
-            
-            # Check if caption is valid
-            if not caption:
-                error_msg = "Failed to extract a valid caption (containing 'tr1gger') from the response"
-                error_msg += f"\n\nActual response:\n{full_response}"
-                raise CaptioningError(error_msg)
-                
-            captions.append(caption)
+        }
+    ]
     
+    # Request caption for the image using Llama 4 Maverick
+    response = client.chat.completions.create(
+        model="meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
+        messages=messages
+    )
+    
+    # Extract caption from the response
+    full_response = response.choices[0].message.content.strip()
+    
+    # Look for the trigger line in the response
+    caption = ""
+    for line in full_response.splitlines():
+        caption = extract_trigger_caption(line)
+        if caption:
+            break
+    
+    # Check if caption is valid
+    if not caption:
+        error_msg = "Failed to extract a valid caption (containing 'tr1gger') from the response"
+        error_msg += f"\n\nActual response:\n{full_response}"
+        raise CaptioningError(error_msg)
+    
+    return caption
+
+def caption_batch_images(client, image_strings, category):
+    """Process and caption multiple images in a single batch request."""
+    # Create a content array with all images
+    content = [{"type": "text", "text": f"Here is the batch of images for {category}. Please caption each image on a separate line, starting each caption with 'tr1gger'."}]
+    
+    # Add all images to the content array
+    for i, img_str in enumerate(image_strings):
+        content.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}})
+        content.append({"type": "text", "text": f"Image {i+1}"})
+    
+    # Send the batch request
+    messages = [
+        {"role": "system", "content": get_prompt()},
+        {"role": "user", "content": content}
+    ]
+    
+    response = client.chat.completions.create(
+        model="meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
+        messages=messages
+    )
+    
+    return process_batch_response(response, image_strings)
+
+def process_batch_response(response, image_strings):
+    """Process the API response from a batch request and extract captions."""
+    # Parse the response to extract captions for each image
+    full_response = response.choices[0].message.content.strip()
+    lines = full_response.splitlines()
+    
+    # Extract captions from the response
+    image_count = len(image_strings)
+    captions = [""] * image_count  # Initialize with empty strings
+    
+    # Extract lines that start with or contain "tr1gger"
+    tr1gger_lines = [line for line in lines if "tr1gger" in line]
+    
+    # Assign captions to images
+    for i in range(image_count):
+        if i < len(tr1gger_lines):
+            caption = extract_trigger_caption(tr1gger_lines[i])
+            captions[i] = caption
+    
+    validate_batch_captions(captions, image_count, full_response)
     return captions
+
+def validate_batch_captions(captions, image_count, full_response):
+    """Validate captions extracted from a batch response."""
+    # Check if all captions are empty or don't contain the trigger word
+    valid_captions = [c for c in captions if c and "tr1gger" in c]
+    if not valid_captions:
+        error_msg = "Failed to parse any valid captions from batch response. Response contained no lines with 'tr1gger'"
+        error_msg += f"\n\nActual response:\n{full_response}"
+        raise CaptioningError(error_msg)
+    
+    # Check if some captions are missing
+    if len(valid_captions) < image_count:
+        missing_count = image_count - len(valid_captions)
+        invalid_captions = [(i, c) for i, c in enumerate(captions) if not c or "tr1gger" not in c]
+        error_msg = f"Failed to parse captions for {missing_count} of {image_count} images in batch mode"
+        error_msg += "\n\nMalformed captions:"
+        for idx, caption in invalid_captions:
+            error_msg += f"\nImage {idx+1}: '{caption}'"
+        raise CaptioningError(error_msg)
+
+def caption_images(images, category=None, batch_mode=False):
+    """Caption a list of images, either individually or in batch mode."""
+    # Convert PIL images to base64 encoded strings
+    image_strings = images_to_base64(images)
+    
+    # Initialize the API client
+    client = get_together_client()
+    
+    # Process images based on the mode
+    if batch_mode and category:
+        return caption_batch_images(client, image_strings, category)
+    else:
+        # Process each image individually
+        return [caption_single_image(client, img_str) for img_str in image_strings]
 
 def extract_captions(file_path):
     captions = []
