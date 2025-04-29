@@ -6,7 +6,7 @@ from together import Together
 TRIGGER_WORD = "tr1gger"
 
 def get_system_prompt():
-    return """Automated Image Captioning (for LoRA Training)
+    return f"""Automated Image Captioning (for LoRA Training)
 
 Role: You are an expert AI captioning system generating precise, structured descriptions for character images optimized for LoRA model training in Stable Diffusion and Flux.1-dev.
 

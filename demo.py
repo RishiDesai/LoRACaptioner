@@ -2,16 +2,11 @@ import gradio as gr
 import os
 import zipfile
 from io import BytesIO
-import PIL.Image
 import time
 import tempfile
-from main import process_images, collect_images_by_category, write_captions  # Import the CLI functions
-from dotenv import load_dotenv
+from main import collect_images_by_category
 from pathlib import Path
-
-# Load environment variables
-load_dotenv()
-
+from caption import caption_images
 # Maximum number of images
 MAX_IMAGES = 30
 
@@ -86,7 +81,6 @@ def process_uploaded_images(image_paths, batch_by_category=False):
                     category_paths = image_paths_by_category[category]
                     print(f"Processing category '{category}' with {len(images)} images")
                     # Use the same code path as CLI
-                    from caption import caption_images
                     category_captions = caption_images(images, category=category, batch_mode=True)
                     print(f"Generated {len(category_captions)} captions for category '{category}'")
                     print("Category captions:", category_captions)  # Debug print category captions
@@ -100,8 +94,6 @@ def process_uploaded_images(image_paths, batch_by_category=False):
                                 captions[idx] = caption
                                 break
             else:
-                # Process all images at once
-                from caption import caption_images
                 print(f"Processing all {len(all_images)} images at once")
                 all_captions = caption_images(all_images, batch_mode=False)
                 print(f"Generated {len(all_captions)} captions")
@@ -121,38 +113,122 @@ def process_uploaded_images(image_paths, batch_by_category=False):
 
 # Main Gradio interface
 with gr.Blocks() as demo:
-    gr.Markdown("# Image Autocaptioner")
+    gr.Markdown("# Image Auto-captioner for LoRA Training")
     
     # Store uploaded images
     stored_image_paths = gr.State([])
-    batch_by_category = gr.State(True)  # State to track if batch by category is enabled
+    batch_by_category = gr.State(False)  # State to track if batch by category is enabled
     
-    # Upload component
+    # Create a two-column layout for the entire interface
     with gr.Row():
-        with gr.Column(scale=2):
-            gr.Markdown("### Upload your images")
+        # Left column for images/upload
+        with gr.Column(scale=1, elem_id="left-column"):
+            # Upload area
+            gr.Markdown("### Upload your images", elem_id="upload-heading")
+            gr.Markdown("Only .png, .jpg, .jpeg, and .webp files are supported", elem_id="file-types-info", elem_classes="file-types-info")
             image_upload = gr.File(
                 file_count="multiple", 
                 label="Drop your files here", 
                 file_types=["image"],
-                type="filepath"
+                type="filepath",
+                height=220,
+                elem_classes="file-upload-container",
             )
         
-        with gr.Column(scale=1):
-            autocaption_btn = gr.Button("Autocaption Images", variant="primary", interactive=False)
-            status_text = gr.Markdown("Upload images to begin", visible=True)
+        # Right column for configuration and captions
+        with gr.Column(scale=1.5, elem_id="right-column"):
+            # Configuration area
+            gr.Markdown("### Configuration")
+            batch_category_checkbox = gr.Checkbox(
+                label="Batch by category", 
+                value=False,
+                info="Caption similar images together"
+            )
             
-            # Advanced settings dropdown
-            with gr.Accordion("Advanced", open=False):
-                batch_category_checkbox = gr.Checkbox(
-                    label="Batch by category", 
-                    value=True,
-                    info="Group similar images together when processing"
-                )
+            caption_btn = gr.Button("Caption Images", variant="primary", interactive=False)
+            download_btn = gr.Button("Download Images + Captions", variant="secondary", interactive=False)
+            download_output = gr.File(label="Download Zip", visible=False)
+            status_text = gr.Markdown("Upload images to begin", visible=True)
+    
+    # Add unified CSS for the layout
+    gr.HTML("""
+    <style>
+    /* Unified styling for the two-column layout */
+    #left-column, #right-column {
+        padding: 10px;
+        align-self: flex-start;
+    }
+    
+    /* Force columns to align at the top */
+    .gradio-row {
+        align-items: flex-start !important;
+    }
+    
+    /* File upload styling */
+    .file-types-info {
+        margin-top: -10px;
+        font-size: 0.9em;
+        color: #666;
+    }
+    
+    .file-upload-container {
+        width: 100%;
+        max-width: 100%;
+    }
+    
+    .file-upload-container .file-preview {
+        max-height: 180px;
+        overflow-y: auto;
+    }
+    
+    /* Image and caption rows styling */
+    .image-caption-row {
+        margin-bottom: 10px;
+        padding: 5px;
+        border-bottom: 1px solid #eee;
+    }
+    
+    /* Make thumbnails same size */
+    .image-thumbnail {
+        height: 200px;
+        width: 200px;
+        object-fit: cover;
+    }
+    
+    /* Center the image thumbnails */
+    #left-column, .image-caption-row > div:first-child {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    /* Ensure the image container itself is centered */
+    .image-thumbnail img, .image-thumbnail > div {
+        margin: 0 auto;
+    }
+    
+    /* Caption text areas */
+    .caption-area {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    /* Download section */
+    .download-section {
+        margin-top: 10px;
+    }
+    </style>
+    """)
     
     # Create a container for the captioning area (initially hidden)
     with gr.Column(visible=False) as captioning_area:
-        gr.Markdown("### Your images and captions")
+        # Replace the single heading with a row containing two headings
+        with gr.Row():
+            with gr.Column(scale=1):
+                gr.Markdown("### Your Images", elem_id="images-heading")
+            with gr.Column(scale=1.5):
+                gr.Markdown("### Your Captions", elem_id="captions-heading")
         
         # Create individual image and caption rows
         image_rows = []
@@ -160,30 +236,30 @@ with gr.Blocks() as demo:
         caption_components = []
         
         for i in range(MAX_IMAGES):
-            with gr.Row(visible=False) as img_row:
+            with gr.Row(visible=False, elem_classes=["image-caption-row"]) as img_row:
                 image_rows.append(img_row)
                 
-                img = gr.Image(
-                    label=f"Image {i+1}",
-                    type="filepath",
-                    show_label=False, 
-                    height=200,
-                    width=200,
-                    scale=1
-                )
-                image_components.append(img)
+                # Left column for image
+                with gr.Column(scale=1):
+                    img = gr.Image(
+                        label=f"Image {i+1}",
+                        type="filepath",
+                        show_label=False, 
+                        height=200,
+                        width=200,
+                        elem_classes=["image-thumbnail"]
+                    )
+                    image_components.append(img)
                 
-                caption = gr.Textbox(
-                    label=f"Caption {i+1}",
-                    lines=3,
-                    scale=2
-                )
-                caption_components.append(caption)
-        
-        # Add download button
-        download_btn = gr.Button("Download Images with Captions", variant="secondary", interactive=False)
-        download_output = gr.File(label="Download Zip", visible=False)
-
+                # Right column for caption
+                with gr.Column(scale=1.5):
+                    caption = gr.Textbox(
+                        label=f"Caption {i+1}",
+                        lines=3,
+                        elem_classes=["caption-area"]
+                    )
+                    caption_components.append(caption)
+    
     def load_captioning(files):
         """Process uploaded images and show them in the UI"""
         if not files:
@@ -211,8 +287,8 @@ with gr.Blocks() as demo:
         return (
             image_paths,  # stored_image_paths
             gr.update(visible=True),  # captioning_area
-            gr.update(interactive=True),  # autocaption_btn
-            gr.update(interactive=True),  # download_btn
+            gr.update(interactive=True),  # caption_btn
+            gr.update(interactive=False),  # download_btn - initially disabled until captioning is done
             gr.update(visible=False),  # download_output
             gr.update(value=f"{len(image_paths)} images ready for captioning"),  # status_text
             *row_updates  # image_rows
@@ -304,7 +380,7 @@ with gr.Blocks() as demo:
     upload_outputs = [
         stored_image_paths,
         captioning_area,
-        autocaption_btn,
+        caption_btn,
         download_btn,
         download_output,
         status_text,
@@ -314,7 +390,7 @@ with gr.Blocks() as demo:
     # Update both paths and images in a single flow
     def process_upload(files):
         # First get paths and visibility updates
-        image_paths, captioning_update, autocaption_update, download_btn_update, download_output_update, status_update, *row_updates = load_captioning(files)
+        image_paths, captioning_update, caption_btn_update, download_btn_update, download_output_update, status_update, *row_updates = load_captioning(files)
         
         # Then get image updates
         image_updates = update_images(image_paths)
@@ -323,7 +399,7 @@ with gr.Blocks() as demo:
         caption_label_updates = update_caption_labels(image_paths)
         
         # Return all updates together
-        return [image_paths, captioning_update, autocaption_update, download_btn_update, download_output_update, status_update] + row_updates + image_updates + caption_label_updates
+        return [image_paths, captioning_update, caption_btn_update, download_btn_update, download_output_update, status_update] + row_updates + image_updates + caption_label_updates
     
     # Combined outputs for both functions
     combined_outputs = upload_outputs + image_components + caption_components
@@ -346,13 +422,13 @@ with gr.Blocks() as demo:
         return gr.update(value="⏳ Processing captions... please wait"), gr.update(interactive=False)
     
     def on_captioning_complete():
-        return gr.update(value="✅ Captioning complete"), gr.update(interactive=True)
+        return gr.update(value="✅ Captioning complete"), gr.update(interactive=True), gr.update(interactive=True)
     
     # Set up captioning button
-    autocaption_btn.click(
+    caption_btn.click(
         on_captioning_start,
         inputs=None,
-        outputs=[status_text, autocaption_btn]
+        outputs=[status_text, caption_btn]
     ).success(
         run_captioning,
         inputs=[stored_image_paths, batch_by_category],
@@ -360,7 +436,7 @@ with gr.Blocks() as demo:
     ).success(
         on_captioning_complete,
         inputs=None,
-        outputs=[status_text, autocaption_btn]
+        outputs=[status_text, caption_btn, download_btn]
     )
     
     # Set up download button
@@ -369,9 +445,13 @@ with gr.Blocks() as demo:
         inputs=[stored_image_paths] + caption_components,
         outputs=[download_output]
     ).then(
-        lambda: gr.update(visible=True),
+        lambda: gr.update(visible=True, elem_classes=["download-section"]),
         inputs=None,
         outputs=[download_output]
+    ).then(
+        lambda: gr.Info("Click the Download button that appeared to save your zip file"),
+        inputs=None,
+        outputs=None
     )
 
 if __name__ == "__main__":
