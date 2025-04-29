@@ -3,7 +3,7 @@ import io
 import os
 from together import Together
 
-MODEL = "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8"
+MODEL_ID = "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8"
 TRIGGER_WORD = "tr1gger"
 
 def get_system_prompt():
@@ -106,7 +106,7 @@ def caption_single_image(client, img_str):
 
     # Request caption for the image using Llama 4 Maverick
     response = client.chat.completions.create(
-        model=MODEL,
+        model=MODEL_ID,
         messages=messages
     )
 
@@ -141,7 +141,7 @@ def caption_image_batch(client, image_strings, category):
         {"role": "user", "content": content}
     ]
     response = client.chat.completions.create(
-        model=MODEL,
+        model=MODEL_ID,
         messages=messages
     )
     return process_batch_response(response, image_strings)
