@@ -494,6 +494,119 @@ def setup_event_handlers(
         outputs=None
     )
 
+# ------- Prompt Optimization UI -------
+
+def create_prompt_optimization_ui():
+    """Create UI components for prompt optimization tab"""
+    with gr.Column(scale=1) as left_column:
+        # Left side for caption input
+        gr.Markdown("### Upload Captions")
+        gr.Markdown("Upload caption files (.txt) or enter captions manually", elem_classes="file-types-info")
+        
+        captions_upload = gr.File(
+            file_count="multiple", 
+            label="Upload caption files", 
+            file_types=[".txt"],
+            type="filepath",
+            elem_classes="file-upload-container"
+        )
+        
+        manual_captions = gr.Textbox(
+            label="Or enter captions manually",
+            lines=5,
+            placeholder="Enter captions here, one per line",
+            elem_classes="prompt-box"
+        )
+        
+        # Add button to use captions from image captioning tab
+        use_generated_captions = gr.Button("Use Captions from Manual Entry", variant="secondary")
+    
+    with gr.Column(scale=1) as right_column:
+        # Right side for prompt input and output
+        gr.Markdown("### Optimize Prompt")
+        
+        user_prompt = gr.Textbox(
+            label="Enter your prompt",
+            lines=3,
+            placeholder="Enter the prompt you want to optimize",
+            elem_classes="prompt-box"
+        )
+        
+        optimize_btn = gr.Button("Optimize Prompt", variant="primary", elem_classes="optimize-btn")
+        
+        optimized_prompt = gr.Textbox(
+            label="Optimized Prompt",
+            lines=5,
+            placeholder="Optimized prompt will appear here",
+            elem_classes="prompt-box"
+        )
+        
+        optimization_status = gr.Markdown("Enter a prompt and upload captions to begin", elem_classes="optimization-status")
+    
+    # Return components but NOT info_md (will create it separately in build_ui)
+    return (
+        left_column, right_column, captions_upload, manual_captions, 
+        use_generated_captions, user_prompt, optimize_btn, 
+        optimized_prompt, optimization_status
+    )
+
+def run_optimization(prompt, caption_files, manual_caption_text):
+    """Handle the prompt optimization logic"""
+    if not prompt or prompt.strip() == "":
+        return "", "Please enter a prompt to optimize"
+    
+    # Handle different input sources for captions
+    caption_list = []
+    
+    if manual_caption_text and manual_caption_text.strip():
+        # Use manually entered captions
+        caption_list = [line.strip() for line in manual_caption_text.split("\n") if line.strip()]
+    
+    elif caption_files and len(caption_files) > 0:
+        # Read captions from uploaded files
+        for file_path in caption_files:
+            if os.path.exists(file_path) and file_path.lower().endswith('.txt'):
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read().strip()
+                    if content:
+                        caption_list.append(content)
+    
+    if not caption_list:
+        return "", "Please upload caption files or enter captions manually"
+    
+    try:
+        # Call the optimize_prompt function from prompt.py
+        result = optimize_prompt(prompt, captions_list=caption_list)
+        return result, "✅ Prompt optimization complete"
+    except Exception as e:
+        return "", f"❌ Error optimizing prompt: {str(e)}"
+
+def setup_prompt_optimization_handlers(
+    captions_upload, manual_captions, use_generated_captions, 
+    user_prompt, optimize_btn, optimized_prompt, 
+    optimization_status, shared_captions
+):
+    """Set up event handlers for prompt optimization tab"""
+    # Function to update manual captions with shared ones
+    def fill_with_shared_captions(captions_list):
+        if not captions_list or len(captions_list) == 0:
+            return "No captions available. Generate captions in the Image Captioning tab first."
+        return "\n".join(captions_list)
+    
+    # Connect button to fill manual captions area
+    use_generated_captions.click(
+        fill_with_shared_captions,
+        inputs=[shared_captions],
+        outputs=[manual_captions]
+    )
+    
+    # Connect the optimize button to the optimization function
+    optimize_btn.click(
+        run_optimization,
+        inputs=[user_prompt, captions_upload, manual_captions],
+        outputs=[optimized_prompt, optimization_status]
+    )
+
 # ------- Main Application -------
 
 def build_ui():
@@ -531,108 +644,25 @@ def build_ui():
             
             with gr.TabItem("Prompt Optimization") as prompt_tab:
                 with gr.Row():
-                    with gr.Column(scale=1):
-                        # Left side for caption input
-                        gr.Markdown("### Upload Captions")
-                        gr.Markdown("Upload caption files (.txt) or enter captions manually", elem_classes="file-types-info")
-                        
-                        captions_upload = gr.File(
-                            file_count="multiple", 
-                            label="Upload caption files", 
-                            file_types=[".txt"],
-                            type="filepath",
-                            elem_classes="file-upload-container"
-                        )
-                        
-                        manual_captions = gr.Textbox(
-                            label="Or enter captions manually (one per line)",
-                            lines=5,
-                            placeholder="Enter captions here, one per line",
-                            elem_classes="prompt-box"
-                        )
-                        
-                        # Add button to use captions from image captioning tab
-                        use_generated_captions = gr.Button("Use Captions from Manual Entry", variant="secondary")
-                        
-                        # Function to update manual captions with shared ones
-                        def fill_with_shared_captions(captions_list):
-                            if not captions_list or len(captions_list) == 0:
-                                return "No captions available. Generate captions in the Image Captioning tab first."
-                            return "\n".join(captions_list)
-                        
-                        # Connect button to fill manual captions area
-                        use_generated_captions.click(
-                            fill_with_shared_captions,
-                            inputs=[shared_captions],
-                            outputs=[manual_captions]
-                        )
-                        
-                    with gr.Column(scale=1):
-                        # Right side for prompt input and output
-                        gr.Markdown("### Optimize Prompt")
-                        
-                        user_prompt = gr.Textbox(
-                            label="Enter your prompt",
-                            lines=3,
-                            placeholder="Enter the prompt you want to optimize",
-                            elem_classes="prompt-box"
-                        )
-                        
-                        optimize_btn = gr.Button("Optimize Prompt", variant="primary", elem_classes="optimize-btn")
-                        
-                        optimized_prompt = gr.Textbox(
-                            label="Optimized Prompt",
-                            lines=5,
-                            placeholder="Optimized prompt will appear here",
-                            elem_classes="prompt-box"
-                        )
-                        
-                        optimization_status = gr.Markdown("Enter a prompt and upload captions to begin", elem_classes="optimization-status")
+                    # Create prompt optimization UI components
+                    (
+                        left_column, right_column, captions_upload, manual_captions,
+                        use_generated_captions, user_prompt, optimize_btn,
+                        optimized_prompt, optimization_status
+                    ) = create_prompt_optimization_ui()
                 
-                # Function to handle optimization
-                def run_optimization(prompt, caption_files, manual_caption_text):
-                    if not prompt or prompt.strip() == "":
-                        return "", "Please enter a prompt to optimize"
-                    
-                    # Handle different input sources for captions
-                    caption_list = []
-                    
-                    if manual_caption_text and manual_caption_text.strip():
-                        # Use manually entered captions
-                        caption_list = [line.strip() for line in manual_caption_text.split("\n") if line.strip()]
-                    
-                    elif caption_files and len(caption_files) > 0:
-                        # Read captions from uploaded files
-                        for file_path in caption_files:
-                            if os.path.exists(file_path) and file_path.lower().endswith('.txt'):
-                                with open(file_path, 'r', encoding='utf-8') as f:
-                                    content = f.read().strip()
-                                    if content:
-                                        caption_list.append(content)
-                    
-                    if not caption_list:
-                        return "", "Please upload caption files or enter captions manually"
-                    
-                    try:
-                        # Call the optimize_prompt function from prompt.py
-                        result = optimize_prompt(prompt, captions_list=caption_list)
-                        return result, "✅ Prompt optimization complete"
-                    except Exception as e:
-                        return "", f"❌ Error optimizing prompt: {str(e)}"
-                
-                # Add info about prompt optimization
+                # Create info markdown directly at the bottom of the tab
                 gr.Markdown("""
                 **About Prompt Optimization:**
                 - This feature helps you craft prompts that match the style of your training captions
-                - Upload caption files, enter captions manually, or use captions from the Image Captioning tab
                 - Enter a simple prompt and the system will optimize it to match your training style
                 """, elem_classes=["category-info"])
                 
-                # Connect the optimize button to the optimization function
-                optimize_btn.click(
-                    run_optimization,
-                    inputs=[user_prompt, captions_upload, manual_captions],
-                    outputs=[optimized_prompt, optimization_status]
+                # Set up prompt optimization event handlers
+                setup_prompt_optimization_handlers(
+                    captions_upload, manual_captions, use_generated_captions,
+                    user_prompt, optimize_btn, optimized_prompt,
+                    optimization_status, shared_captions
                 )
         
         # Add CSS styling
