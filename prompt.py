@@ -1,9 +1,7 @@
 import os
 import argparse
 from pathlib import Path
-from caption import get_system_prompt, get_together_client, extract_captions
-
-MODEL_ID = "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8"
+from caption import get_system_prompt, get_together_client, extract_captions, MODEL_ID
 
 def optimize_prompt(user_prompt, captions_dir=None, captions_list=None):
     """Optimize a user prompt to follow the same format as training captions.

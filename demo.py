@@ -8,6 +8,7 @@ from pathlib import Path
 import shutil
 
 from main import process_images
+from prompt import optimize_prompt
 
 # Maximum number of images
 MAX_IMAGES = 30
@@ -304,6 +305,30 @@ def get_css_styles():
         margin-bottom: 10px;
         border-left: 3px solid #4CAF50;
     }
+    
+    /* Tab styling */
+    .tabs {
+        margin-top: 20px;
+    }
+    
+    /* Prompt optimization tab styling */
+    .optimization-status {
+        margin-top: 10px;
+        padding: 8px;
+        border-radius: 4px;
+        background-color: #f8f9fa;
+    }
+    
+    /* Input/output boxes for prompt optimization */
+    .prompt-box {
+        margin-bottom: 15px;
+    }
+    
+    /* Make optimize button stand out */
+    .optimize-btn {
+        margin-top: 10px;
+        margin-bottom: 15px;
+    }
     </style>
     """
 
@@ -398,7 +423,7 @@ def create_captioning_area():
 def setup_event_handlers(
     image_upload, stored_image_paths, captioning_area, caption_btn, download_btn, 
     download_output, status_text, image_rows, image_components, caption_components,
-    batch_category_checkbox, batch_by_category
+    batch_category_checkbox, batch_by_category, shared_captions=None
 ):
     """Set up all event handlers for the UI"""
     # Combined outputs for the upload function
@@ -428,8 +453,8 @@ def setup_event_handlers(
         outputs=[batch_by_category]
     )
     
-    # Set up captioning button
-    caption_btn.click(
+    # Set up captioning button chain
+    caption_chain = caption_btn.click(
         on_captioning_start,
         inputs=None,
         outputs=[status_text, caption_btn]
@@ -442,6 +467,17 @@ def setup_event_handlers(
         inputs=None,
         outputs=[status_text, caption_btn, download_btn]
     )
+    
+    # If shared_captions is provided, add an additional handler to update it
+    if shared_captions is not None:
+        def extract_valid_captions(*caption_values):
+            return [c for c in caption_values if c and c.strip()]
+        
+        caption_chain.success(
+            extract_valid_captions,
+            inputs=caption_components,
+            outputs=[shared_captions]
+        )
     
     # Set up download button
     download_btn.click(
@@ -465,30 +501,142 @@ def build_ui():
     with gr.Blocks() as demo:
         gr.Markdown("# Image Auto-captioner for LoRA Training")
         
-        # Store uploaded images
-        stored_image_paths = gr.State([])
-        batch_by_category = gr.State(False)  # State to track if batch by category is enabled
+        # Store generated captions for sharing between tabs
+        shared_captions = gr.State([])
         
-        # Create a two-column layout for the entire interface
-        with gr.Row():
-            # Create upload area in left column
-            _, image_upload = create_upload_area()
+        # Create tabs for different functionality
+        with gr.Tabs() as tabs:
+            with gr.TabItem("Image Captioning") as captioning_tab:
+                # Store uploaded images
+                stored_image_paths = gr.State([])
+                batch_by_category = gr.State(False)  # State to track if batch by category is enabled
+                
+                # Create a two-column layout for the entire interface
+                with gr.Row():
+                    # Create upload area in left column
+                    _, image_upload = create_upload_area()
+                    
+                    # Create config area in right column
+                    _, batch_category_checkbox, caption_btn, download_btn, download_output, status_text = create_config_area()
+                
+                # Create captioning area (initially hidden)
+                captioning_area, image_rows, image_components, caption_components = create_captioning_area()
+                
+                # Set up event handlers with shared captions
+                setup_event_handlers(
+                    image_upload, stored_image_paths, captioning_area, caption_btn, download_btn,
+                    download_output, status_text, image_rows, image_components, caption_components,
+                    batch_category_checkbox, batch_by_category, shared_captions
+                )
             
-            # Create config area in right column
-            _, batch_category_checkbox, caption_btn, download_btn, download_output, status_text = create_config_area()
+            with gr.TabItem("Prompt Optimization") as prompt_tab:
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        # Left side for caption input
+                        gr.Markdown("### Upload Captions")
+                        gr.Markdown("Upload caption files (.txt) or enter captions manually", elem_classes="file-types-info")
+                        
+                        captions_upload = gr.File(
+                            file_count="multiple", 
+                            label="Upload caption files", 
+                            file_types=[".txt"],
+                            type="filepath",
+                            elem_classes="file-upload-container"
+                        )
+                        
+                        manual_captions = gr.Textbox(
+                            label="Or enter captions manually (one per line)",
+                            lines=5,
+                            placeholder="Enter captions here, one per line",
+                            elem_classes="prompt-box"
+                        )
+                        
+                        # Add button to use captions from image captioning tab
+                        use_generated_captions = gr.Button("Use Captions from Manual Entry", variant="secondary")
+                        
+                        # Function to update manual captions with shared ones
+                        def fill_with_shared_captions(captions_list):
+                            if not captions_list or len(captions_list) == 0:
+                                return "No captions available. Generate captions in the Image Captioning tab first."
+                            return "\n".join(captions_list)
+                        
+                        # Connect button to fill manual captions area
+                        use_generated_captions.click(
+                            fill_with_shared_captions,
+                            inputs=[shared_captions],
+                            outputs=[manual_captions]
+                        )
+                        
+                    with gr.Column(scale=1):
+                        # Right side for prompt input and output
+                        gr.Markdown("### Optimize Prompt")
+                        
+                        user_prompt = gr.Textbox(
+                            label="Enter your prompt",
+                            lines=3,
+                            placeholder="Enter the prompt you want to optimize",
+                            elem_classes="prompt-box"
+                        )
+                        
+                        optimize_btn = gr.Button("Optimize Prompt", variant="primary", elem_classes="optimize-btn")
+                        
+                        optimized_prompt = gr.Textbox(
+                            label="Optimized Prompt",
+                            lines=5,
+                            placeholder="Optimized prompt will appear here",
+                            elem_classes="prompt-box"
+                        )
+                        
+                        optimization_status = gr.Markdown("Enter a prompt and upload captions to begin", elem_classes="optimization-status")
+                
+                # Function to handle optimization
+                def run_optimization(prompt, caption_files, manual_caption_text):
+                    if not prompt or prompt.strip() == "":
+                        return "", "Please enter a prompt to optimize"
+                    
+                    # Handle different input sources for captions
+                    caption_list = []
+                    
+                    if manual_caption_text and manual_caption_text.strip():
+                        # Use manually entered captions
+                        caption_list = [line.strip() for line in manual_caption_text.split("\n") if line.strip()]
+                    
+                    elif caption_files and len(caption_files) > 0:
+                        # Read captions from uploaded files
+                        for file_path in caption_files:
+                            if os.path.exists(file_path) and file_path.lower().endswith('.txt'):
+                                with open(file_path, 'r', encoding='utf-8') as f:
+                                    content = f.read().strip()
+                                    if content:
+                                        caption_list.append(content)
+                    
+                    if not caption_list:
+                        return "", "Please upload caption files or enter captions manually"
+                    
+                    try:
+                        # Call the optimize_prompt function from prompt.py
+                        result = optimize_prompt(prompt, captions_list=caption_list)
+                        return result, "✅ Prompt optimization complete"
+                    except Exception as e:
+                        return "", f"❌ Error optimizing prompt: {str(e)}"
+                
+                # Add info about prompt optimization
+                gr.Markdown("""
+                **About Prompt Optimization:**
+                - This feature helps you craft prompts that match the style of your training captions
+                - Upload caption files, enter captions manually, or use captions from the Image Captioning tab
+                - Enter a simple prompt and the system will optimize it to match your training style
+                """, elem_classes=["category-info"])
+                
+                # Connect the optimize button to the optimization function
+                optimize_btn.click(
+                    run_optimization,
+                    inputs=[user_prompt, captions_upload, manual_captions],
+                    outputs=[optimized_prompt, optimization_status]
+                )
         
         # Add CSS styling
         gr.HTML(get_css_styles())
-        
-        # Create captioning area (initially hidden)
-        captioning_area, image_rows, image_components, caption_components = create_captioning_area()
-        
-        # Set up event handlers
-        setup_event_handlers(
-            image_upload, stored_image_paths, captioning_area, caption_btn, download_btn,
-            download_output, status_text, image_rows, image_components, caption_components,
-            batch_category_checkbox, batch_by_category
-        )
     
     return demo
 
