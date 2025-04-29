@@ -3,6 +3,7 @@ import argparse
 from pathlib import Path
 from caption import get_system_prompt, get_together_client, extract_captions
 
+MODEL = "deepseek-ai/DeepSeek-V3"
 
 def optimize_prompt(user_prompt, captions_dir=None, captions_list=None):
     """Optimize a user prompt to follow the same format as training captions.
@@ -43,7 +44,7 @@ def optimize_prompt(user_prompt, captions_dir=None, captions_list=None):
     ]
 
     response = client.chat.completions.create(
-        model="meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
+        model=MODEL,
         messages=messages
     )
 

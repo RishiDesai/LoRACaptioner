@@ -504,8 +504,8 @@ def create_config_area():
         gr.Markdown("""
         **Note about categorization:**
         - Images are grouped by the part of the filename before the last underscore
-        - For example: "character_pose_01.png" and "character_pose_02.png" share the category "character_pose"
-        - When using "Batch by category", similar images are captioned together for more consistent results
+        - For example: "character_pose_1.png" and "character_pose_2.png" share the category "character_pose"
+        - When using "Batch process by category", similar images are captioned together for more consistent results
         """, elem_classes=["category-info"])
         
         caption_btn = gr.Button("Caption Images", variant="primary", interactive=False)
