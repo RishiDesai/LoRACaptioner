@@ -4,10 +4,10 @@ import zipfile
 from io import BytesIO
 import time
 import tempfile
-from main import collect_images_by_category, is_image_file
 from pathlib import Path
-from caption import caption_images
-from PIL import Image
+import shutil
+
+from main import process_images
 
 # Maximum number of images
 MAX_IMAGES = 30
@@ -33,208 +33,46 @@ def create_download_file(image_paths, captions):
     
     return zip_io.getvalue()
 
-def save_images_to_temp(image_paths, temp_dir):
-    """Copy images to temporary directory and return mapping"""
-    temp_image_paths = []
-    original_to_temp = {}  # Map original paths to temp paths
-    
-    for path in image_paths:
-        # Keep original filename to preserve categorization
-        filename = os.path.basename(path)
-        temp_path = os.path.join(temp_dir, filename)
-        
-        # Ensure we're using consistent path formats
-        orig_path_str = str(path)
-        temp_path_str = str(temp_path)
-        
-        with open(path, 'rb') as src, open(temp_path, 'wb') as dst:
-            dst.write(src.read())
-        
-        temp_image_paths.append(temp_path_str)
-        original_to_temp[orig_path_str] = temp_path_str
-        print(f"Copied {orig_path_str} to {temp_path_str}")
-    
-    print(f"Created {len(temp_image_paths)} temporary files")
-    return temp_image_paths, original_to_temp
-
-def process_by_category(images_by_category, image_paths_by_category, image_paths, original_to_temp):
-    """Process images by category and map captions back to original images"""
-    captions = [""] * len(image_paths)  # Initialize with empty strings
-    
-    # Create a mapping from temp path to index in the original image_paths
-    temp_to_original_idx = {}
-    for i, orig_path in enumerate(image_paths):
-        if orig_path in original_to_temp:
-            temp_to_original_idx[original_to_temp[orig_path]] = i
-    
-    print(f"Created mapping for {len(temp_to_original_idx)} images")
-    
-    for category, images in images_by_category.items():
-        category_paths = image_paths_by_category[category]
-        print(f"Processing category '{category}' with {len(images)} images")
-        
-        # Create mapping of image to its position in the category
-        category_image_map = {}
-        for i, (img, path) in enumerate(zip(images, category_paths)):
-            category_image_map[str(path)] = i
-        
-        try:
-            # Use the same code path as CLI
-            category_captions = caption_images(images, category=category, batch_mode=True)
-            print(f"Generated {len(category_captions)} captions for category '{category}'")
-            
-            # Map captions back to original paths using our direct mapping
-            for i, temp_path in enumerate(category_paths):
-                temp_path_str = str(temp_path)
-                if i < len(category_captions) and temp_path_str in temp_to_original_idx:
-                    original_idx = temp_to_original_idx[temp_path_str]
-                    captions[original_idx] = category_captions[i]
-        except Exception as e:
-            print(f"Error processing category '{category}': {e}")
-            # Fall back to individual processing for this category
-            try:
-                print(f"Falling back to individual processing for category '{category}'")
-                for i, img in enumerate(images):
-                    if i >= len(category_paths):
-                        continue
-                    temp_path = category_paths[i]
-                    temp_path_str = str(temp_path)
-                    
-                    try:
-                        single_captions = caption_images([img], batch_mode=False)
-                        if single_captions and len(single_captions) > 0:
-                            if temp_path_str in temp_to_original_idx:
-                                original_idx = temp_to_original_idx[temp_path_str]
-                                captions[original_idx] = single_captions[0]
-                    except Exception as inner_e:
-                        print(f"Error processing individual image {i} in '{category}': {inner_e}")
-            except Exception as fallback_e:
-                print(f"Error in fallback processing for '{category}': {fallback_e}")
-    
-    return captions
-
-def process_all_images(all_images, all_image_paths, image_paths):
-    """Process all images at once without categorization"""
-    print(f"Processing all {len(all_images)} images at once")
-    
-    # Initialize empty captions list
-    captions = [""] * len(image_paths)  # Initialize with empty strings for all original paths
-    
-    # If there are no images, return empty captions
-    if not all_images:
-        print("No images to process, returning empty captions")
-        return captions
-    
-    # Create a mapping from temp paths to original indexes for efficient lookup
-    path_to_idx = {str(path): i for i, path in enumerate(image_paths)}
-    
-    try:
-        all_captions = caption_images(all_images, batch_mode=False)
-        print(f"Generated {len(all_captions)} captions")
-        
-        # Map captions to the right images using the prepared image_paths
-        for i, (path, caption) in enumerate(zip(all_image_paths, all_captions)):
-            if i < len(all_captions) and path in path_to_idx:
-                idx = path_to_idx[path]
-                captions[idx] = caption
-    except Exception as e:
-        print(f"Error generating captions: {e}")
-    
-    return captions
-
 def process_uploaded_images(image_paths, batch_by_category=False):
-    """Process uploaded images using the same code path as CLI"""
-    try:
-        # Convert all image paths to strings for consistency
-        image_paths = [str(path) for path in image_paths]
-        print(f"Processing {len(image_paths)} images, batch_by_category={batch_by_category}")
+    """Process uploaded images using main.py's functions"""
+    # Create temporary directories for input and output
+    with tempfile.TemporaryDirectory() as temp_input_dir, tempfile.TemporaryDirectory() as temp_output_dir:
+        # Copy all images to the temporary input directory
+        temp_input_path = Path(temp_input_dir)
+        temp_output_path = Path(temp_output_dir)
         
-        # Create temporary directory with images
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Save images to temp directory
-            temp_image_paths, original_to_temp = save_images_to_temp(image_paths, temp_dir)
+        # Map of original paths to filenames in temp dir
+        path_mapping = {}
+        
+        for i, path in enumerate(image_paths):
+            # Keep original filename to preserve categorization
+            filename = os.path.basename(path)
+            temp_path = temp_input_path / filename
             
-            # Use Path object for consistency with main.py
-            temp_dir_path = Path(temp_dir)
+            # Copy file to temp directory
+            shutil.copy2(path, temp_path)
+            path_mapping[str(temp_path)] = str(path)
             
-            # List files in temp directory for debugging
-            print(f"Files in temp directory {temp_dir}:")
-            for f in temp_dir_path.iterdir():
-                print(f"  - {f} (is_file: {f.is_file()}, is_image: {is_image_file(f.name)})")
+        # Process the images using main.py's function
+        process_images(temp_input_dir, temp_output_dir, fix_outfit=False, batch_images=batch_by_category)
+        
+        # Collect the captions from the output directory
+        captions = []
+        for orig_path in image_paths:
+            # Get the base filename without extension
+            base_name = os.path.splitext(os.path.basename(orig_path))[0]
+            caption_filename = f"{base_name}.txt"
+            caption_path = temp_output_path / caption_filename
             
-            # Collect images by category using the function from main.py
-            images_by_category, image_paths_by_category = collect_images_by_category(temp_dir_path)
-            
-            # Print categories and counts for debugging
-            print(f"Collected images into {len(images_by_category)} categories")
-            for category, images in images_by_category.items():
-                print(f"  - Category '{category}': {len(images)} images")
-            
-            # Check if we actually have images to process
-            total_images = sum(len(images) for images in images_by_category.values())
-            if total_images == 0:
-                print("No images were properly categorized. Adding all images directly.")
-                # Add all images directly without categorization
-                default_category = "default"
-                images_by_category[default_category] = []
-                image_paths_by_category[default_category] = []
-                
-                for path in image_paths:
-                    path_str = str(path)
-                    try:
-                        if path_str in original_to_temp:
-                            temp_path = original_to_temp[path_str]
-                            temp_path_obj = Path(temp_path)
-                            img = Image.open(temp_path).convert("RGB")
-                            images_by_category[default_category].append(img)
-                            image_paths_by_category[default_category].append(temp_path_obj)
-                    except Exception as e:
-                        print(f"Error loading image {path}: {e}")
-            
-            # Map back to original paths for consistent ordering
-            all_images = []
-            all_image_paths = []
-            
-            # Create reverse mapping for lookup
-            temp_to_orig = {v: k for k, v in original_to_temp.items()}
-            
-            # Go through each category and map back to original
-            for category in images_by_category:
-                for i, temp_path in enumerate(image_paths_by_category[category]):
-                    temp_path_str = str(temp_path)
-                    if temp_path_str in temp_to_orig:
-                        orig_path = temp_to_orig[temp_path_str]
-                        if i < len(images_by_category[category]):
-                            all_images.append(images_by_category[category][i])
-                            all_image_paths.append(orig_path)
-            
-            # Ensure we maintain original order
-            ordered_images = []
-            ordered_paths = []
-            
-            for orig_path in image_paths:
-                path_str = str(orig_path)
-                for i, path in enumerate(all_image_paths):
-                    if path == path_str and i < len(all_images):
-                        ordered_images.append(all_images[i])
-                        ordered_paths.append(path)
-                        break
-            
-            print(f"Collected {len(ordered_images)} images in correct order")
-            
-            # Process based on batch setting
-            if batch_by_category and len(images_by_category) > 0:
-                captions = process_by_category(images_by_category, image_paths_by_category, image_paths, original_to_temp)
+            # If caption file exists, read it; otherwise use empty string
+            if os.path.exists(caption_path):
+                with open(caption_path, 'r', encoding='utf-8') as f:
+                    caption = f.read()
+                captions.append(caption)
             else:
-                # Use our own function for non-batch mode since it needs to map back to UI
-                captions = process_all_images(ordered_images, ordered_paths, image_paths)
-            
-            print(f"Returning {len(captions)} captions")
-            return captions
-            
-    except Exception as e:
-        print(f"Error in processing: {e}")
-        raise
+                captions.append("")
+        
+        return captions
 
 # ------- UI Interaction Functions -------
 
@@ -295,7 +133,7 @@ def update_caption_labels(image_paths):
     return updates
 
 def run_captioning(image_paths, batch_category):
-    """Generate captions for the images using the CLI code path"""
+    """Generate captions for the images using the main.py functions"""
     if not image_paths:
         return [gr.update(value="") for _ in range(MAX_IMAGES)] + [gr.update(value="No images to process")]
             

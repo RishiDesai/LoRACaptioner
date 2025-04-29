@@ -3,7 +3,7 @@ import io
 import os
 from together import Together
 
-MODEL = "deepseek-ai/DeepSeek-V3"
+MODEL = "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8"
 TRIGGER_WORD = "tr1gger"
 
 def get_system_prompt():
