@@ -4,7 +4,7 @@ import os
 from together import Together
 
 MODEL_ID = "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8"
-TRIGGER_WORD = "tr1gger"
+TRIGGER_WORD = "tr1gg3r"
 
 def get_system_prompt():
     return f"""Automated Image Captioning (for LoRA Training)
