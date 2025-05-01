@@ -242,7 +242,7 @@ def get_css_styles():
     
     /* File upload styling */
     .file-types-info {
-        margin-top: -10px;
+        margin-top: 0px;
         font-size: 0.9em;
         color: #666;
     }
