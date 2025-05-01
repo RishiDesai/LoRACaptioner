@@ -508,7 +508,8 @@ def create_prompt_optimization_ui():
             label="Upload caption files", 
             file_types=[".txt"],
             type="filepath",
-            elem_classes="file-upload-container"
+            elem_classes="file-upload-container",
+            height=220
         )
         
         manual_captions = gr.Textbox(
@@ -524,6 +525,7 @@ def create_prompt_optimization_ui():
     with gr.Column(scale=1) as right_column:
         # Right side for prompt input and output
         gr.Markdown("### Optimize Prompt")
+        gr.Markdown("\n- Craft prompts that match the style of your training captions\n- Enter a simple prompt and receive an optimized version\n", elem_classes=["category-info"])
         
         user_prompt = gr.Textbox(
             label="Enter your prompt",
@@ -650,13 +652,6 @@ def build_ui():
                         use_generated_captions, user_prompt, optimize_btn,
                         optimized_prompt, optimization_status
                     ) = create_prompt_optimization_ui()
-                
-                # Create info markdown directly at the bottom of the tab
-                gr.Markdown("""
-                **About Prompt Optimization:**
-                - This feature helps you craft prompts that match the style of your training captions
-                - Enter a simple prompt and the system will optimize it to match your training style
-                """, elem_classes=["category-info"])
                 
                 # Set up prompt optimization event handlers
                 setup_prompt_optimization_handlers(
