@@ -266,9 +266,9 @@ def get_css_styles():
     
     /* Make thumbnails same size */
     .image-thumbnail {
-        height: 200px;
-        width: 200px;
-        object-fit: cover;
+        height: 100%;
+        width: 100%;
+        object-fit: contain;
     }
     
     /* Center the image thumbnails */
