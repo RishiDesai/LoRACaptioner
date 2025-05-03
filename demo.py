@@ -55,7 +55,7 @@ def process_uploaded_images(image_paths, batch_by_category=False):
             path_mapping[str(temp_path)] = str(path)
             
         # Process the images using main.py's function
-        process_images(temp_input_dir, temp_output_dir, fix_outfit=False, batch_images=batch_by_category)
+        process_images(temp_input_dir, temp_output_dir, batch_images=batch_by_category)
         
         # Collect the captions from the output directory
         captions = []

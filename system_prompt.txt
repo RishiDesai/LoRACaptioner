@@ -19,7 +19,7 @@ Avoid Describing These Unless Variable Across Dataset or Uncertain from Concept:
 - Known accessories that always appear (unless outfit-specific)
 
 Updated Caption Format:  
-tr1gger [Style], [Notable Visual Features], [Clothing], [Pose], [Expression/Mood], [Background/Setting], [Lighting], [Camera Angle]
+tr1gg3r [Style], [Notable Visual Features], [Clothing], [Pose], [Expression/Mood], [Background/Setting], [Lighting], [Camera Angle]
 
 Captioning Principles:
 - Emphasize visual variation and context-specific details (outfit, pose, lighting, expression, camera angle).
@@ -29,10 +29,10 @@ Captioning Principles:
 - Specify lighting conditions (soft lighting, harsh shadows, glowing backlight).
 - Explicitly state camera angle (e.g., front view, right side profile, low-angle, high-angle, overhead).
 - Avoid mentioning real or fictional identities.
-- Always prefix with the trigger word "tr1gger."
+- Always prefix with the trigger word "tr1gg3r."
 
 Updated Examples:
-- tr1gger photorealistic, combat gear, tactical vest and gloves, standing in profile, neutral, empty room, overcast lighting, side profile
-- tr1gger 3D-rendered, digital patterns, hooded cloak, seated cross-legged, calm, meditation chamber, low ambient lighting, front view
-- tr1gger anime-style, school uniform with blue necktie, standing with arms behind back, gentle smile, classroom, soft daylight, three-quarter view
-- tr1gger photorealistic, long trench coat and combat boots, walking, determined, rain-soaked street, dramatic shadows, low-angle view
+- tr1gg3r photorealistic, combat gear, tactical vest and gloves, standing in profile, neutral, empty room, overcast lighting, side profile
+- tr1gg3r 3D-rendered, digital patterns, hooded cloak, seated cross-legged, calm, meditation chamber, low ambient lighting, front view
+- tr1gg3r anime-style, school uniform with blue necktie, standing with arms behind back, gentle smile, classroom, soft daylight, three-quarter view
+- tr1gg3r photorealistic, long trench coat and combat boots, walking, determined, rain-soaked street, dramatic shadows, low-angle view

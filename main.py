@@ -108,7 +108,7 @@ def process_all_at_once(images_by_category, image_paths_by_category, input_path,
     return processed_count
 
 
-def process_images(input_dir, output_dir, fix_outfit=False, batch_images=False):
+def process_images(input_dir, output_dir, batch_images=False):
     """Process all images in the input directory and generate captions."""
     input_path = Path(input_dir)
     output_path = Path(output_dir) if output_dir else input_path
@@ -159,7 +159,6 @@ def main():
     parser = argparse.ArgumentParser(description='Generate captions for images using GPT-4o.')
     parser.add_argument('--input', type=str, required=True, help='Directory containing images')
     parser.add_argument('--output', type=str, help='Directory to save images and captions (defaults to input directory)')
-    parser.add_argument('--fix_outfit', action='store_true', help='Flag to indicate if character has one outfit')
     parser.add_argument('--batch_images', action='store_true', help='Flag to indicate if images should be processed in batches')
 
     args = parser.parse_args()
@@ -168,7 +167,7 @@ def main():
         print(f"Error: Input directory '{args.input}' does not exist.")
         return
 
-    process_images(args.input, args.output, args.fix_outfit, args.batch_images)
+    process_images(args.input, args.output, args.batch_images)
 
 
 if __name__ == "__main__":
