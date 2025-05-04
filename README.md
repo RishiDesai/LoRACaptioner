@@ -63,24 +63,7 @@ python demo.py
 
 ### Examples
 
-<table>
-  <tr>
-    <th>Original Image</th>
-    <th>Generated Caption</th>
-  </tr>
-  <tr>
-    <td><img src="examples/landscape.jpg" alt="Landscape" width="300"/></td>
-    <td>"tr1gger photorealistic, mountain landscape, hiking gear and outdoor clothing, standing at viewpoint, awestruck, snow-capped peaks and valley, golden sunset light, wide-angle view"</td>
-  </tr>
-  <tr>
-    <td><img src="examples/city.jpg" alt="City" width="300"/></td>
-    <td>"tr1gger photorealistic, urban architecture, business suit with briefcase, walking on sidewalk, focused expression, downtown skyscrapers, evening city lights, street-level view"</td>
-  </tr>
-  <tr>
-    <td><img src="examples/food.jpg" alt="Food" width="300"/></td>
-    <td>"tr1gger photorealistic, culinary presentation, chef's uniform and hat, plating dish, concentrated, modern restaurant kitchen, soft studio lighting, overhead camera angle"</td>
-  </tr>
-</table>
+TODO
 
 ## License
 
