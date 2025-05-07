@@ -79,11 +79,9 @@ python demo.py
 holding a bow and arrow in a dense forest
 
 **Optimized Prompt:**  
-```
-tr1gg3r anime-style, pink spiky hair and black markings on face, shirtless with dark arm bands, holding bow and arrow, focused expression, dense forest, soft dappled lighting, three-quarter view
-```
+`tr1gg3r anime-style, pink spiky hair and black markings on face, shirtless with dark arm bands, holding bow and arrow, focused expression, dense forest, soft dappled lighting, three-quarter view`
 
-![Sukuna with bow and arrow](examples/sukuna_1.png){width=300}
+<img src="examples/sukuna_1.png" alt="Sukuna with bow and arrow" width="500">
 
 ---
 
@@ -91,11 +89,9 @@ tr1gg3r anime-style, pink spiky hair and black markings on face, shirtless with 
 drinking coffee in a san francisco cafe, white cloak, side view
 
 **Optimized Prompt:**  
-```
-tr1gg3r anime-style, spiky pink hair and facial markings, white cloak, sitting with cup in hand, neutral expression, cafe interior with san francisco view, soft natural lighting, side profile
-```
+`tr1gg3r anime-style, spiky pink hair and facial markings, white cloak, sitting with cup in hand, neutral expression, cafe interior with san francisco view, soft natural lighting, side profile`
 
-![Sukuna drinking coffee](examples/sukuna_2.png){width=300}
+<img src="examples/sukuna_2.png" alt="Sukuna drinking coffee" width="500">
 
 ---
 
@@ -103,11 +99,9 @@ tr1gg3r anime-style, spiky pink hair and facial markings, white cloak, sitting w
 playing pick-up basketball on a sunny day
 
 **Optimized Prompt:**  
-```
-tr1gg3r photorealistic, athletic build, sleeveless basketball jersey and shorts, jumping with ball, focused expression, outdoor basketball court with spectators, bright sunlight, low-angle view
-```
+`tr1gg3r photorealistic, athletic build, sleeveless basketball jersey and shorts, jumping with ball, focused expression, outdoor basketball court with spectators, bright sunlight, low-angle view`
 
-![Sukuna playing basketball](examples/sukuna_3.png){width=300}
+<img src="examples/sukuna_3.png" alt="Sukuna playing basketball" width="500">
 
 ---
 
@@ -117,11 +111,9 @@ tr1gg3r photorealistic, athletic build, sleeveless basketball jersey and shorts,
 riding a horse on a prairie during sunset
 
 **Optimized Prompt:**  
-```
-tr1gger photorealistic, curly shoulder-length hair, floral button-up shirt, riding a horse, neutral expression, prairie during sunset, warm directional lighting, three-quarter view
-```
+`tr1gger photorealistic, curly shoulder-length hair, floral button-up shirt, riding a horse, neutral expression, prairie during sunset, warm directional lighting, three-quarter view`
 
-![Woman riding a horse](examples/woman_1.png){width=300}
+<img src="examples/woman_1.png" alt="Woman riding a horse" width="500">
 
 ---
 
@@ -129,11 +121,9 @@ tr1gger photorealistic, curly shoulder-length hair, floral button-up shirt, ridi
 painting on a canvas in an art studio, side-view
 
 **Optimized Prompt:**  
-```
-tr1gg3r photorealistic, curly shoulder-length hair, floral button-up shirt, standing at an angle with brush in hand, neutral expression, art studio with canvas and paints, soft natural lighting, right side profile
-```
+`tr1gg3r photorealistic, curly shoulder-length hair, floral button-up shirt, standing at an angle with brush in hand, neutral expression, art studio with canvas and paints, soft natural lighting, right side profile`
 
-![Woman painting in studio](examples/woman_2.png){width=300}
+<img src="examples/woman_2.png" alt="Woman painting in studio" width="500">
 
 ---
 
@@ -141,11 +131,9 @@ tr1gg3r photorealistic, curly shoulder-length hair, floral button-up shirt, stan
 standing on a skyscraper in a dense city, dramatic stormy lighting, rear view
 
 **Optimized Prompt:**  
-```
-tr1gg3r photorealistic, curly shoulder-length hair, floral button-up shirt, standing upright, neutral expression, skyscraper rooftop in dense city, dramatic stormy lighting, back view
-```
+`tr1gg3r photorealistic, curly shoulder-length hair, floral button-up shirt, standing upright, neutral expression, skyscraper rooftop in dense city, dramatic stormy lighting, back view`
 
-![Woman on skyscraper](examples/woman_3.png){width=300}
+<img src="examples/woman_3.png" alt="Woman on skyscraper" width="500">
 
 ## License
 
