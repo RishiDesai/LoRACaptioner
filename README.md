@@ -16,12 +16,12 @@ pinned: false
 
 <table>
   <tr>
-    <td><img src="examples/sukuna_4.png" alt="Sukuna example 4" width="300"></td>
-    <td><img src="examples/sukuna_5.png" alt="Sukuna example 5" width="300"></td>
+    <td><img src="examples/sukuna_4.png" alt="Sukuna example 4" width="400"></td>
+    <td><img src="examples/sukuna_5.png" alt="Sukuna example 5" width="400"></td>
   </tr>
   <tr>
-    <td><img src="examples/sukuna_6.png" alt="Sukuna example 6" width="300"></td>
-    <td><img src="examples/sukuna_7.png" alt="Sukuna example 7" width="300"></td>
+    <td><img src="examples/sukuna_6.png" alt="Sukuna example 6" width="400"></td>
+    <td><img src="examples/sukuna_7.png" alt="Sukuna example 7" width="400"></td>
   </tr>
 </table>
 
@@ -79,13 +79,11 @@ python demo.py
 holding a bow and arrow in a dense forest
 
 **Optimized Prompt:**  
-<div style="max-width: 600px; word-wrap: break-word;">
 ```
 tr1gg3r anime-style, pink spiky hair and black markings on face, shirtless with dark arm bands, holding bow and arrow, focused expression, dense forest, soft dappled lighting, three-quarter view
 ```
-</div>
 
-![Sukuna with bow and arrow](examples/sukuna_1.png)
+![Sukuna with bow and arrow](examples/sukuna_1.png){width=300}
 
 ---
 
@@ -93,13 +91,11 @@ tr1gg3r anime-style, pink spiky hair and black markings on face, shirtless with 
 drinking coffee in a san francisco cafe, white cloak, side view
 
 **Optimized Prompt:**  
-<div style="max-width: 600px; word-wrap: break-word;">
 ```
 tr1gg3r anime-style, spiky pink hair and facial markings, white cloak, sitting with cup in hand, neutral expression, cafe interior with san francisco view, soft natural lighting, side profile
 ```
-</div>
 
-![Sukuna drinking coffee](examples/sukuna_2.png)
+![Sukuna drinking coffee](examples/sukuna_2.png){width=300}
 
 ---
 
@@ -107,13 +103,11 @@ tr1gg3r anime-style, spiky pink hair and facial markings, white cloak, sitting w
 playing pick-up basketball on a sunny day
 
 **Optimized Prompt:**  
-<div style="max-width: 600px; word-wrap: break-word;">
 ```
 tr1gg3r photorealistic, athletic build, sleeveless basketball jersey and shorts, jumping with ball, focused expression, outdoor basketball court with spectators, bright sunlight, low-angle view
 ```
-</div>
 
-![Sukuna playing basketball](examples/sukuna_3.png)
+![Sukuna playing basketball](examples/sukuna_3.png){width=300}
 
 ---
 
@@ -123,13 +117,11 @@ tr1gg3r photorealistic, athletic build, sleeveless basketball jersey and shorts,
 riding a horse on a prairie during sunset
 
 **Optimized Prompt:**  
-<div style="max-width: 600px; word-wrap: break-word;">
 ```
 tr1gger photorealistic, curly shoulder-length hair, floral button-up shirt, riding a horse, neutral expression, prairie during sunset, warm directional lighting, three-quarter view
 ```
-</div>
 
-![Woman riding a horse](examples/woman_1.png)
+![Woman riding a horse](examples/woman_1.png){width=300}
 
 ---
 
@@ -137,13 +129,11 @@ tr1gger photorealistic, curly shoulder-length hair, floral button-up shirt, ridi
 painting on a canvas in an art studio, side-view
 
 **Optimized Prompt:**  
-<div style="max-width: 600px; word-wrap: break-word;">
 ```
 tr1gg3r photorealistic, curly shoulder-length hair, floral button-up shirt, standing at an angle with brush in hand, neutral expression, art studio with canvas and paints, soft natural lighting, right side profile
 ```
-</div>
 
-![Woman painting in studio](examples/woman_2.png)
+![Woman painting in studio](examples/woman_2.png){width=300}
 
 ---
 
@@ -151,13 +141,11 @@ tr1gg3r photorealistic, curly shoulder-length hair, floral button-up shirt, stan
 standing on a skyscraper in a dense city, dramatic stormy lighting, rear view
 
 **Optimized Prompt:**  
-<div style="max-width: 600px; word-wrap: break-word;">
 ```
 tr1gg3r photorealistic, curly shoulder-length hair, floral button-up shirt, standing upright, neutral expression, skyscraper rooftop in dense city, dramatic stormy lighting, back view
 ```
-</div>
 
-![Woman on skyscraper](examples/woman_3.png)
+![Woman on skyscraper](examples/woman_3.png){width=300}
 
 ## License
 
