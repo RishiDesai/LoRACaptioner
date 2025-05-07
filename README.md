@@ -134,7 +134,3 @@ standing on a skyscraper in a dense city, dramatic stormy lighting, rear view
 `tr1gg3r photorealistic, curly shoulder-length hair, floral button-up shirt, standing upright, neutral expression, skyscraper rooftop in dense city, dramatic stormy lighting, back view`
 
 <img src="examples/woman_3.png" alt="Woman on skyscraper" width="500">
-
-## License
-
-[MIT License](LICENSE)
