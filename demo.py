@@ -615,6 +615,9 @@ def build_ui():
     """Build and return the Gradio interface"""
     with gr.Blocks() as demo:
         gr.Markdown("# Image Auto-captioner for LoRA Training")
+
+        gr.Markdown("""Check out the [code](https://github.com/RishiDesai/LoRACaptioner)
+                    and see my [blog post](https://rishidesai.github.io/posts/character-lora/) for more information.""")
         
         # Store generated captions for sharing between tabs
         shared_captions = gr.State([])
