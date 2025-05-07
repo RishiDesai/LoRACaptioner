@@ -1,14 +1,3 @@
----
-title: LoRACaptioner
-emoji: 🤠
-colorFrom: red
-colorTo: green
-sdk: gradio
-sdk_version: 5.25.2
-app_file: demo.py
-pinned: false
----
-
 # LoRACaptioner
 
 - **Image Captioning**: Automatically generate detailed and structured captions for your LoRA dataset.
