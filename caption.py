@@ -91,10 +91,14 @@ def extract_caption(line):
     return ""
 
 
-def caption_single_image(client, img_str):
-    """Process and caption a single image."""
+def caption_single_image(client, img_str, partial_caption=None):
+    """Process and caption a single image, using a partial caption if available."""
+    system_prompt = get_system_prompt()
+    if partial_caption:
+        system_prompt += f"\nPartial Caption: {partial_caption}"
+
     messages = [
-        {"role": "system", "content": get_system_prompt()},
+        {"role": "system", "content": system_prompt},
         {
             "role": "user",
             "content": [
@@ -125,8 +129,8 @@ def caption_single_image(client, img_str):
     return caption
 
 
-def caption_image_batch(client, image_strings, category):
-    """Process and caption multiple images in a single batch request."""
+def caption_image_batch(client, image_strings, category, partial_captions):
+    """Process and caption multiple images in a single batch request, using partial captions if available."""
     # Create a content array with all images
     content = [{"type": "text",
                 "text": f"Here is the batch of images for {category}. "
@@ -134,6 +138,9 @@ def caption_image_batch(client, image_strings, category):
 
     for i, img_str in enumerate(image_strings):
         content.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}})
+        partial_caption = partial_captions.get(f"Image {i + 1}", "")
+        if partial_caption:
+            content.append({"type": "text", "text": f"Partial Caption: {partial_caption}"})
         content.append({"type": "text", "text": f"Image {i + 1}"})
 
     messages = [
@@ -189,16 +196,20 @@ def validate_batch_captions(captions, image_count, full_response):
         raise CaptioningError(error_msg)
 
 
-def caption_images(images, category=None, batch_mode=False):
-    """Caption a list of images, either individually or in batch mode."""
+def caption_images(images, category=None, batch_mode=False, partial_captions=None):
+    """Caption a list of images, either individually or in batch mode, using partial captions if available."""
     image_strings = images_to_base64(images)
 
     client = get_together_client()
 
+    # Use partial captions if provided
+    if partial_captions is None:
+        partial_captions = {}
+
     if batch_mode and category:
-        return caption_image_batch(client, image_strings, category)
+        return caption_image_batch(client, image_strings, category, partial_captions)
     else:
-        return [caption_single_image(client, img_str) for img_str in image_strings]
+        return [caption_single_image(client, img_str, partial_captions.get(image.filename)) for img_str, image in zip(image_strings, images)]
 
 
 def extract_captions(file_path):

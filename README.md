@@ -41,6 +41,7 @@
    - `--input` (str): Directory containing images to caption.
    - `--output` (str): Directory to save images and captions (defaults to input directory).
    - `--batch_images` (flag): Caption images in batches by category.
+   - `--partial_captions` (str): JSON file containing partial captions for images that will be used to assist in generating full captions.
    </details>
 
 
