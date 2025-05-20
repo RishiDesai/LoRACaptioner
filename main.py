@@ -85,8 +85,10 @@ def process_by_category(images_by_category, image_paths_by_category, input_path,
     for category, images in images_by_category.items():
         image_paths = image_paths_by_category[category]
         try:
+            # Get filenames for the images
+            filenames = [path.name for path in image_paths]
             # Generate captions for the entire category using batch mode
-            captions = caption_images(images, category=category, batch_mode=True, partial_captions=partial_captions)
+            captions = caption_images(images, image_filenames=filenames, category=category, batch_mode=True, partial_captions=partial_captions)
             write_captions(image_paths, captions, input_path, output_path)
             processed_count += len(images)
         except Exception as e:
@@ -100,7 +102,9 @@ def process_all_at_once(images_by_category, image_paths_by_category, input_path,
     all_image_paths = [path for paths in image_paths_by_category.values() for path in paths]
     processed_count = 0
     try:
-        captions = caption_images(all_images, batch_mode=False, partial_captions=partial_captions)
+        # Get filenames for all images
+        filenames = [path.name for path in all_image_paths]
+        captions = caption_images(all_images, image_filenames=filenames, batch_mode=False, partial_captions=partial_captions)
         write_captions(all_image_paths, captions, input_path, output_path)
         processed_count += len(all_images)
     except Exception as e:

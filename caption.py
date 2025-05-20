@@ -18,6 +18,10 @@ IMPORTANT: You MUST follow these rules EXACTLY:
 5. DO NOT include any text before or after the caption
 6. If you don't follow this format exactly, the caption will be rejected
 
+When a partial caption is provided:
+1. PRESERVE THE MEANING of all information from the partial caption
+2. You may rephrase or reword sections from the partial caption to better fit the format, as long as the core meaning/content is preserved
+
 General Guidelines:
 1. Prioritize Consistency – Maintain uniform descriptions across all images in a dataset. Avoid introducing variation in features that should remain constant (e.g., fixed traits like eye color, hair color, or markings that are inherently part of the concept and handled during model training).
 2. Concise and Structured – Only describe visible and significant visual attributes. Use a standardized format for clarity and efficiency.
@@ -196,8 +200,16 @@ def validate_batch_captions(captions, image_count, full_response):
         raise CaptioningError(error_msg)
 
 
-def caption_images(images, category=None, batch_mode=False, partial_captions=None):
-    """Caption a list of images, either individually or in batch mode, using partial captions if available."""
+def caption_images(images, image_filenames=None, category=None, batch_mode=False, partial_captions=None):
+    """Caption a list of images, either individually or in batch mode, using partial captions if available.
+    
+    Args:
+        images: List of PIL Image objects
+        image_filenames: List of filenames corresponding to the images
+        category: Category name for batch processing
+        batch_mode: Whether to process images in batch
+        partial_captions: Dictionary mapping filenames to partial captions
+    """
     image_strings = images_to_base64(images)
 
     client = get_together_client()
@@ -207,9 +219,25 @@ def caption_images(images, category=None, batch_mode=False, partial_captions=Non
         partial_captions = {}
 
     if batch_mode and category:
-        return caption_image_batch(client, image_strings, category, partial_captions)
+        # For batch mode, create a mapping of indices to partial captions
+        batch_partial_captions = {}
+        for i, filename in enumerate(image_filenames or []):
+            if filename in partial_captions:
+                batch_partial_captions[f"Image {i + 1}"] = partial_captions[filename]
+        return caption_image_batch(client, image_strings, category, batch_partial_captions)
     else:
-        return [caption_single_image(client, img_str, partial_captions.get(image.filename)) for img_str, image in zip(image_strings, images)]
+        # Process each image individually
+        captions = []
+        for i, img_str in enumerate(image_strings):
+            filename = image_filenames[i] if image_filenames else None
+            partial_caption = partial_captions.get(filename, "") if filename else ""
+            try:
+                caption = caption_single_image(client, img_str, partial_caption)
+                captions.append(caption)
+            except Exception as e:
+                print(f"Error captioning image {filename or f'#{i + 1}'}: {e}")
+                captions.append("")
+        return captions
 
 
 def extract_captions(file_path):
