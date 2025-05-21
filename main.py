@@ -79,14 +79,16 @@ def collect_images_by_category(input_path):
     return images_by_category, image_paths_by_category
 
 
-def process_by_category(images_by_category, image_paths_by_category, input_path, output_path):
+def process_by_category(images_by_category, image_paths_by_category, input_path, output_path, partial_captions):
     """Process images in batches by category."""
     processed_count = 0
     for category, images in images_by_category.items():
         image_paths = image_paths_by_category[category]
         try:
+            # Get filenames for the images
+            filenames = [path.name for path in image_paths]
             # Generate captions for the entire category using batch mode
-            captions = caption_images(images, category=category, batch_mode=True)
+            captions = caption_images(images, image_filenames=filenames, category=category, batch_mode=True, partial_captions=partial_captions)
             write_captions(image_paths, captions, input_path, output_path)
             processed_count += len(images)
         except Exception as e:
@@ -94,13 +96,15 @@ def process_by_category(images_by_category, image_paths_by_category, input_path,
     return processed_count
 
 
-def process_all_at_once(images_by_category, image_paths_by_category, input_path, output_path):
+def process_all_at_once(images_by_category, image_paths_by_category, input_path, output_path, partial_captions):
     """Process all images at once."""
     all_images = [img for imgs in images_by_category.values() for img in imgs]
     all_image_paths = [path for paths in image_paths_by_category.values() for path in paths]
     processed_count = 0
     try:
-        captions = caption_images(all_images, batch_mode=False)
+        # Get filenames for all images
+        filenames = [path.name for path in all_image_paths]
+        captions = caption_images(all_images, image_filenames=filenames, batch_mode=False, partial_captions=partial_captions)
         write_captions(all_image_paths, captions, input_path, output_path)
         processed_count += len(all_images)
     except Exception as e:
@@ -108,7 +112,7 @@ def process_all_at_once(images_by_category, image_paths_by_category, input_path,
     return processed_count
 
 
-def process_images(input_dir, output_dir, batch_images=False):
+def process_images(input_dir, output_dir, batch_images=False, partial_captions={}):
     """Process all images in the input directory and generate captions."""
     input_path = Path(input_dir)
     output_path = Path(output_dir) if output_dir else input_path
@@ -128,9 +132,9 @@ def process_images(input_dir, output_dir, batch_images=False):
         return
 
     if batch_images:
-        processed_count = process_by_category(images_by_category, image_paths_by_category, input_path, output_path)
+        processed_count = process_by_category(images_by_category, image_paths_by_category, input_path, output_path, partial_captions)
     else:
-        processed_count = process_all_at_once(images_by_category, image_paths_by_category, input_path, output_path)
+        processed_count = process_all_at_once(images_by_category, image_paths_by_category, input_path, output_path, partial_captions)
 
     print(f"\nProcessing complete. {processed_count} images were captioned.")
 
@@ -160,6 +164,7 @@ def main():
     parser.add_argument('--input', type=str, required=True, help='Directory containing images')
     parser.add_argument('--output', type=str, help='Directory to save images and captions (defaults to input directory)')
     parser.add_argument('--batch_images', action='store_true', help='Flag to indicate if images should be processed in batches')
+    parser.add_argument('--partial_captions', type=str, help='Path to a JSON file containing partial captions for images')
 
     args = parser.parse_args()
 
@@ -167,7 +172,14 @@ def main():
         print(f"Error: Input directory '{args.input}' does not exist.")
         return
 
-    process_images(args.input, args.output, args.batch_images)
+    # Load partial captions if provided
+    partial_captions = {}
+    if args.partial_captions:
+        import json
+        with open(args.partial_captions, 'r') as f:
+            partial_captions = json.load(f)
+
+    process_images(args.input, args.output, args.batch_images, partial_captions)
 
 
 if __name__ == "__main__":
