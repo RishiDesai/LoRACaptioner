@@ -2,6 +2,7 @@ import base64
 import io
 import os
 from together import Together
+from PIL import Image
 
 MODEL_ID = "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8"
 TRIGGER_WORD = "tr1gg3r"
@@ -21,6 +22,7 @@ IMPORTANT: You MUST follow these rules EXACTLY:
 When a partial caption is provided:
 1. PRESERVE THE MEANING of all information from the partial caption
 2. You may rephrase or reword sections from the partial caption to better fit the format, as long as the core meaning/content is preserved
+3. If an "Outfit Description" is provided, use it in the [Clothing] and/or [Notable Visual Features] sections
 
 General Guidelines:
 1. Prioritize Consistency – Maintain uniform descriptions across all images in a dataset. Avoid introducing variation in features that should remain constant (e.g., fixed traits like eye color, hair color, or markings that are inherently part of the concept and handled during model training).
@@ -139,6 +141,11 @@ def caption_image_batch(client, image_strings, category, partial_captions):
     content = [{"type": "text",
                 "text": f"Here is the batch of images for {category}. "
                         f"Caption each image on a separate line."}]
+    
+    # Add outfit description if available in partial captions
+    outfit_description = partial_captions.pop("outfit", None)
+    if outfit_description:
+        content.append({"type": "text", "text": f"Outfit Description: {outfit_description}"})
 
     for i, img_str in enumerate(image_strings):
         content.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}})
@@ -200,7 +207,7 @@ def validate_batch_captions(captions, image_count, full_response):
         raise CaptioningError(error_msg)
 
 
-def caption_images(images, image_filenames=None, category=None, batch_mode=False, partial_captions=None):
+def caption_images(images, image_filenames=None, category=None, batch_mode=False, partial_captions=None, reference_image=None):
     """Caption a list of images, either individually or in batch mode, using partial captions if available.
     
     Args:
@@ -209,6 +216,7 @@ def caption_images(images, image_filenames=None, category=None, batch_mode=False
         category: Category name for batch processing
         batch_mode: Whether to process images in batch
         partial_captions: Dictionary mapping filenames to partial captions
+        reference_image: Path to a reference image for outfit consistency
     """
     image_strings = images_to_base64(images)
 
@@ -218,19 +226,47 @@ def caption_images(images, image_filenames=None, category=None, batch_mode=False
     if partial_captions is None:
         partial_captions = {}
 
+    # Process reference image if provided
+    outfit_description = None
+    if reference_image:
+        try:
+            reference_img = Image.open(reference_image).convert("RGB")
+            reference_img_base64 = images_to_base64([reference_img])[0]
+            
+            # Get outfit description from reference image
+            print("Generating outfit description from reference image...")
+            outfit_description = get_outfit_description_from_reference(client, reference_img_base64)
+            print(f"Using outfit description: '{outfit_description}'")
+        except Exception as e:
+            print(f"Error processing reference image: {e}")
+
     if batch_mode and category:
         # For batch mode, create a mapping of indices to partial captions
         batch_partial_captions = {}
         for i, filename in enumerate(image_filenames or []):
             if filename in partial_captions:
                 batch_partial_captions[f"Image {i + 1}"] = partial_captions[filename]
+                
+        # Add outfit description if available
+        if outfit_description:
+            batch_partial_captions["outfit"] = outfit_description
+            
         return caption_image_batch(client, image_strings, category, batch_partial_captions)
     else:
         # Process each image individually
         captions = []
+        
         for i, img_str in enumerate(image_strings):
             filename = image_filenames[i] if image_filenames else None
             partial_caption = partial_captions.get(filename, "") if filename else ""
+            
+            # If we have a reference outfit description, add it to the partial caption
+            if outfit_description:
+                if partial_caption:
+                    partial_caption = f"{partial_caption}\nOutfit Description: {outfit_description}"
+                else:
+                    partial_caption = f"Outfit Description: {outfit_description}"
+            
             try:
                 caption = caption_single_image(client, img_str, partial_caption)
                 captions.append(caption)
@@ -238,6 +274,33 @@ def caption_images(images, image_filenames=None, category=None, batch_mode=False
                 print(f"Error captioning image {filename or f'#{i + 1}'}: {e}")
                 captions.append("")
         return captions
+
+
+def get_outfit_description_from_reference(client, reference_img_base64):
+    """Get outfit description from reference image."""
+    system_prompt = """You are an expert at describing character outfits for LoRA training. 
+Analyze the reference image and extract ONLY the clothing/outfit description.
+Your response should be a brief, detailed description of ONLY the outfit/clothing, nothing else.
+Do not include style, pose, background, or other elements - ONLY the clothing/outfit.
+"""
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {
+            "role": "user", 
+            "content": [
+                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{reference_img_base64}"}},
+                {"type": "text", "text": "Describe ONLY the outfit/clothing in this reference image."}
+            ]
+        }
+    ]
+
+    response = client.chat.completions.create(
+        model=MODEL_ID,
+        messages=messages
+    )
+
+    return response.choices[0].message.content.strip()
 
 
 def extract_captions(file_path):
