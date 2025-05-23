@@ -79,7 +79,7 @@ def collect_images_by_category(input_path):
     return images_by_category, image_paths_by_category
 
 
-def process_by_category(images_by_category, image_paths_by_category, input_path, output_path, partial_captions):
+def process_by_category(images_by_category, image_paths_by_category, input_path, output_path, partial_captions, reference_image=None):
     """Process images in batches by category."""
     processed_count = 0
     for category, images in images_by_category.items():
@@ -88,7 +88,8 @@ def process_by_category(images_by_category, image_paths_by_category, input_path,
             # Get filenames for the images
             filenames = [path.name for path in image_paths]
             # Generate captions for the entire category using batch mode
-            captions = caption_images(images, image_filenames=filenames, category=category, batch_mode=True, partial_captions=partial_captions)
+            captions = caption_images(images, image_filenames=filenames, category=category, batch_mode=True, 
+                                     partial_captions=partial_captions, reference_image=reference_image)
             write_captions(image_paths, captions, input_path, output_path)
             processed_count += len(images)
         except Exception as e:
@@ -96,7 +97,7 @@ def process_by_category(images_by_category, image_paths_by_category, input_path,
     return processed_count
 
 
-def process_all_at_once(images_by_category, image_paths_by_category, input_path, output_path, partial_captions):
+def process_all_at_once(images_by_category, image_paths_by_category, input_path, output_path, partial_captions, reference_image=None):
     """Process all images at once."""
     all_images = [img for imgs in images_by_category.values() for img in imgs]
     all_image_paths = [path for paths in image_paths_by_category.values() for path in paths]
@@ -104,7 +105,8 @@ def process_all_at_once(images_by_category, image_paths_by_category, input_path,
     try:
         # Get filenames for all images
         filenames = [path.name for path in all_image_paths]
-        captions = caption_images(all_images, image_filenames=filenames, batch_mode=False, partial_captions=partial_captions)
+        captions = caption_images(all_images, image_filenames=filenames, batch_mode=False, 
+                                 partial_captions=partial_captions, reference_image=reference_image)
         write_captions(all_image_paths, captions, input_path, output_path)
         processed_count += len(all_images)
     except Exception as e:
@@ -112,13 +114,31 @@ def process_all_at_once(images_by_category, image_paths_by_category, input_path,
     return processed_count
 
 
-def process_images(input_dir, output_dir, batch_images=False, partial_captions={}):
+def process_images(input_dir, output_dir, batch_images=False, partial_captions={}, reference_image=None):
     """Process all images in the input directory and generate captions."""
     input_path = Path(input_dir)
     output_path = Path(output_dir) if output_dir else input_path
 
     validate_input_directory(input_dir)
     os.makedirs(output_path, exist_ok=True)
+
+    # Process reference image if provided
+    reference_image_path = None
+    if reference_image:
+        # First check if it's a filename in the input directory
+        input_ref_path = input_path / reference_image
+        if input_ref_path.exists() and is_image_file(input_ref_path.name):
+            reference_image_path = input_ref_path
+            print(f"Using reference image from input directory: {reference_image}")
+        else:
+            # Then check if it's an absolute path
+            abs_ref_path = Path(reference_image)
+            if abs_ref_path.exists() and is_image_file(abs_ref_path.name):
+                reference_image_path = abs_ref_path
+                print(f"Using reference image from absolute path: {reference_image}")
+            else:
+                print(f"Error: Reference image '{reference_image}' not found in input directory or as absolute path.")
+                return
 
     # Collect images by category
     images_by_category, image_paths_by_category = collect_images_by_category(input_path)
@@ -132,9 +152,11 @@ def process_images(input_dir, output_dir, batch_images=False, partial_captions={
         return
 
     if batch_images:
-        processed_count = process_by_category(images_by_category, image_paths_by_category, input_path, output_path, partial_captions)
+        processed_count = process_by_category(images_by_category, image_paths_by_category, input_path, output_path, 
+                                             partial_captions, reference_image_path)
     else:
-        processed_count = process_all_at_once(images_by_category, image_paths_by_category, input_path, output_path, partial_captions)
+        processed_count = process_all_at_once(images_by_category, image_paths_by_category, input_path, output_path, 
+                                             partial_captions, reference_image_path)
 
     print(f"\nProcessing complete. {processed_count} images were captioned.")
 
@@ -165,6 +187,7 @@ def main():
     parser.add_argument('--output', type=str, help='Directory to save images and captions (defaults to input directory)')
     parser.add_argument('--batch_images', action='store_true', help='Flag to indicate if images should be processed in batches')
     parser.add_argument('--partial_captions', type=str, help='Path to a JSON file containing partial captions for images')
+    parser.add_argument('--reference_image', type=str, help='Reference image for outfit consistency. The outfit from this image will be used in all captions. Can be a filename in the input directory or an absolute path.')
 
     args = parser.parse_args()
 
@@ -179,7 +202,7 @@ def main():
         with open(args.partial_captions, 'r') as f:
             partial_captions = json.load(f)
 
-    process_images(args.input, args.output, args.batch_images, partial_captions)
+    process_images(args.input, args.output, args.batch_images, partial_captions, args.reference_image)
 
 
 if __name__ == "__main__":
