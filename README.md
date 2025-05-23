@@ -40,8 +40,8 @@
 
    - `--input` (str): Directory containing images to caption.
    - `--output` (str): Directory to save images and captions (defaults to input directory).
-   - `--batch_images` (flag): Caption images in batches by category.
    - `--partial_captions` (str): JSON file containing partial captions for images that will be used to assist in generating full captions.
+   - `--reference_image` (str): Reference image for outfit consistency. The outfit from this image will be used in all captions.
    </details>
 
 
@@ -53,9 +53,9 @@ python demo.py
 ```
 
 ### Notes
-- Images are processed individually in standard mode
-- For large collections, batch processing by category is recommended
+- All images are processed individually for consistent results
 - Each caption is saved as a .txt file with the same name as the image
+- Use the reference image feature to maintain outfit consistency across captions
 
 ### Troubleshooting
 

@@ -135,86 +135,12 @@ def caption_single_image(client, img_str, partial_caption=None):
     return caption
 
 
-def caption_image_batch(client, image_strings, category, partial_captions):
-    """Process and caption multiple images in a single batch request, using partial captions if available."""
-    # Create a content array with all images
-    content = [{"type": "text",
-                "text": f"Here is the batch of images for {category}. "
-                        f"Caption each image on a separate line."}]
-    
-    # Add outfit description if available in partial captions
-    outfit_description = partial_captions.pop("outfit", None)
-    if outfit_description:
-        content.append({"type": "text", "text": f"Outfit Description: {outfit_description}"})
-
-    for i, img_str in enumerate(image_strings):
-        content.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_str}"}})
-        partial_caption = partial_captions.get(f"Image {i + 1}", "")
-        if partial_caption:
-            content.append({"type": "text", "text": f"Partial Caption: {partial_caption}"})
-        content.append({"type": "text", "text": f"Image {i + 1}"})
-
-    messages = [
-        {"role": "system", "content": get_system_prompt()},
-        {"role": "user", "content": content}
-    ]
-    response = client.chat.completions.create(
-        model=MODEL_ID,
-        messages=messages
-    )
-    return process_batch_response(response, image_strings)
-
-
-def process_batch_response(response, image_strings):
-    """Process the API response from a batch request and extract captions."""
-    full_response = response.choices[0].message.content.strip()
-    lines = full_response.splitlines()
-
-    # Extract captions from the response
-    image_count = len(image_strings)
-    captions = [""] * image_count
-
-    # Extract lines that start with or contain trigger_word
-    caption_lines = [line for line in lines if TRIGGER_WORD in line]
-
-    # Assign captions to images
-    for i in range(image_count):
-        if i < len(caption_lines):
-            caption = extract_caption(caption_lines[i])
-            captions[i] = caption
-
-    validate_batch_captions(captions, image_count, full_response)
-    return captions
-
-
-def validate_batch_captions(captions, image_count, full_response):
-    """Validate captions extracted from a batch response."""
-    # Check if all captions are empty or don't contain the trigger word
-    valid_captions = [c for c in captions if c and TRIGGER_WORD in c]
-    if not valid_captions:
-        error_msg = "Failed to parse any valid captions from batch response."
-        error_msg += f"\n\nActual response:\n{full_response}"
-        raise CaptioningError(error_msg)
-
-    # Check if some captions are missing
-    if len(valid_captions) < image_count:
-        missing_count = image_count - len(valid_captions)
-        invalid_captions = [(i, c) for i, c in enumerate(captions) if not c or TRIGGER_WORD not in c]
-        error_msg = f"Failed to parse captions for {missing_count} of {image_count} images in batch mode"
-        error_msg += "\n\nMalformed captions:"
-        for idx, caption in invalid_captions:
-            error_msg += f"\nImage {idx + 1}: '{caption}'"
-        raise CaptioningError(error_msg)
-
-
-def caption_images(images, image_filenames=None, category=None, batch_mode=False, partial_captions=None, reference_image=None):
-    """Caption a list of images, either individually or in batch mode, using partial captions if available.
+def caption_images(images, image_filenames=None, partial_captions=None, reference_image=None):
+    """Caption a list of images individually, using partial captions if available.
     
     Args:
         images: List of PIL Image objects
         image_filenames: List of filenames corresponding to the images
-        category: Category name for batch processing
-        batch_mode: Whether to process images in batch
         partial_captions: Dictionary mapping filenames to partial captions
         reference_image: Path to a reference image for outfit consistency
     """
@@ -240,40 +166,27 @@ def caption_images(images, image_filenames=None, category=None, batch_mode=False
         except Exception as e:
             print(f"Error processing reference image: {e}")
 
-    if batch_mode and category:
-        # For batch mode, create a mapping of indices to partial captions
-        batch_partial_captions = {}
-        for i, filename in enumerate(image_filenames or []):
-            if filename in partial_captions:
-                batch_partial_captions[f"Image {i + 1}"] = partial_captions[filename]
-                
-        # Add outfit description if available
-        if outfit_description:
-            batch_partial_captions["outfit"] = outfit_description
-            
-        return caption_image_batch(client, image_strings, category, batch_partial_captions)
-    else:
-        # Process each image individually
-        captions = []
+    # Process each image individually
+    captions = []
+    
+    for i, img_str in enumerate(image_strings):
+        filename = image_filenames[i] if image_filenames else None
+        partial_caption = partial_captions.get(filename, "") if filename else ""
         
-        for i, img_str in enumerate(image_strings):
-            filename = image_filenames[i] if image_filenames else None
-            partial_caption = partial_captions.get(filename, "") if filename else ""
-            
-            # If we have a reference outfit description, add it to the partial caption
-            if outfit_description:
-                if partial_caption:
-                    partial_caption = f"{partial_caption}\nOutfit Description: {outfit_description}"
-                else:
-                    partial_caption = f"Outfit Description: {outfit_description}"
-            
-            try:
-                caption = caption_single_image(client, img_str, partial_caption)
-                captions.append(caption)
-            except Exception as e:
-                print(f"Error captioning image {filename or f'#{i + 1}'}: {e}")
-                captions.append("")
-        return captions
+        # If we have a reference outfit description, add it to the partial caption
+        if outfit_description:
+            if partial_caption:
+                partial_caption = f"{partial_caption}\nOutfit Description: {outfit_description}"
+            else:
+                partial_caption = f"Outfit Description: {outfit_description}"
+        
+        try:
+            caption = caption_single_image(client, img_str, partial_caption)
+            captions.append(caption)
+        except Exception as e:
+            print(f"Error captioning image {filename or f'#{i + 1}'}: {e}")
+            captions.append("")
+    return captions
 
 
 def get_outfit_description_from_reference(client, reference_img_base64):

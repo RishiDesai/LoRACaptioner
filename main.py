@@ -53,68 +53,24 @@ def validate_input_directory(input_dir):
             print(f"  - {file}")
 
 
-def collect_images_by_category(input_path):
-    """Collect all valid images and group them by category."""
-    images_by_category = {}
-    image_paths_by_category = {}
+def collect_all_images(input_path):
+    """Collect all valid images from the input directory."""
+    images = []
+    image_paths = []
 
     for file_path in input_path.iterdir():
         if file_path.is_file() and is_image_file(file_path.name):
             try:
                 image = Image.open(file_path).convert("RGB")
-
-                # Determine the category from the filename
-                category = file_path.stem.rsplit('_', 1)[0]
-
-                # Add image to the appropriate category
-                if category not in images_by_category:
-                    images_by_category[category] = []
-                    image_paths_by_category[category] = []
-
-                images_by_category[category].append(image)
-                image_paths_by_category[category].append(file_path)
+                images.append(image)
+                image_paths.append(file_path)
             except Exception as e:
                 print(f"Error loading {file_path.name}: {e}")
 
-    return images_by_category, image_paths_by_category
+    return images, image_paths
 
 
-def process_by_category(images_by_category, image_paths_by_category, input_path, output_path, partial_captions, reference_image=None):
-    """Process images in batches by category."""
-    processed_count = 0
-    for category, images in images_by_category.items():
-        image_paths = image_paths_by_category[category]
-        try:
-            # Get filenames for the images
-            filenames = [path.name for path in image_paths]
-            # Generate captions for the entire category using batch mode
-            captions = caption_images(images, image_filenames=filenames, category=category, batch_mode=True, 
-                                     partial_captions=partial_captions, reference_image=reference_image)
-            write_captions(image_paths, captions, input_path, output_path)
-            processed_count += len(images)
-        except Exception as e:
-            print(f"Error generating captions for category '{category}': {e}")
-    return processed_count
-
-
-def process_all_at_once(images_by_category, image_paths_by_category, input_path, output_path, partial_captions, reference_image=None):
-    """Process all images at once."""
-    all_images = [img for imgs in images_by_category.values() for img in imgs]
-    all_image_paths = [path for paths in image_paths_by_category.values() for path in paths]
-    processed_count = 0
-    try:
-        # Get filenames for all images
-        filenames = [path.name for path in all_image_paths]
-        captions = caption_images(all_images, image_filenames=filenames, batch_mode=False, 
-                                 partial_captions=partial_captions, reference_image=reference_image)
-        write_captions(all_image_paths, captions, input_path, output_path)
-        processed_count += len(all_images)
-    except Exception as e:
-        print(f"Error generating captions: {e}")
-    return processed_count
-
-
-def process_images(input_dir, output_dir, batch_images=False, partial_captions={}, reference_image=None):
+def process_images(input_dir, output_dir, partial_captions={}, reference_image=None):
     """Process all images in the input directory and generate captions."""
     input_path = Path(input_dir)
     output_path = Path(output_dir) if output_dir else input_path
@@ -140,23 +96,28 @@ def process_images(input_dir, output_dir, batch_images=False, partial_captions={
                 print(f"Error: Reference image '{reference_image}' not found in input directory or as absolute path.")
                 return
 
-    # Collect images by category
-    images_by_category, image_paths_by_category = collect_images_by_category(input_path)
+    # Collect all images
+    images, image_paths = collect_all_images(input_path)
 
     # Log the number of images found
-    total_images = sum(len(images) for images in images_by_category.values())
+    total_images = len(images)
     print(f"Found {total_images} images to process.")
 
     if not total_images:
         print("No valid images found to process.")
         return
 
-    if batch_images:
-        processed_count = process_by_category(images_by_category, image_paths_by_category, input_path, output_path, 
-                                             partial_captions, reference_image_path)
-    else:
-        processed_count = process_all_at_once(images_by_category, image_paths_by_category, input_path, output_path, 
-                                             partial_captions, reference_image_path)
+    # Process all images individually
+    processed_count = 0
+    try:
+        # Get filenames for all images
+        filenames = [path.name for path in image_paths]
+        captions = caption_images(images, image_filenames=filenames, 
+                                 partial_captions=partial_captions, reference_image=reference_image_path)
+        write_captions(image_paths, captions, input_path, output_path)
+        processed_count = len(images)
+    except Exception as e:
+        print(f"Error generating captions: {e}")
 
     print(f"\nProcessing complete. {processed_count} images were captioned.")
 
@@ -182,10 +143,9 @@ def write_captions(image_paths, captions, input_path, output_path):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Generate captions for images using GPT-4o.')
+    parser = argparse.ArgumentParser(description='Generate captions for images using Llama 4 Maverick.')
     parser.add_argument('--input', type=str, required=True, help='Directory containing images')
     parser.add_argument('--output', type=str, help='Directory to save images and captions (defaults to input directory)')
-    parser.add_argument('--batch_images', action='store_true', help='Flag to indicate if images should be processed in batches')
     parser.add_argument('--partial_captions', type=str, help='Path to a JSON file containing partial captions for images')
     parser.add_argument('--reference_image', type=str, help='Reference image for outfit consistency. The outfit from this image will be used in all captions. Can be a filename in the input directory or an absolute path.')
 
@@ -202,7 +162,7 @@ def main():
         with open(args.partial_captions, 'r') as f:
             partial_captions = json.load(f)
 
-    process_images(args.input, args.output, args.batch_images, partial_captions, args.reference_image)
+    process_images(args.input, args.output, partial_captions, args.reference_image)
 
 
 if __name__ == "__main__":

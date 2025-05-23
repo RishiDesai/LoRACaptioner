@@ -34,7 +34,7 @@ def create_download_file(image_paths, captions):
     
     return zip_io.getvalue()
 
-def process_uploaded_images(image_paths, batch_by_category=False):
+def process_uploaded_images(image_paths):
     """Process uploaded images using main.py's functions"""
     # Create temporary directories for input and output
     with tempfile.TemporaryDirectory() as temp_input_dir, tempfile.TemporaryDirectory() as temp_output_dir:
@@ -55,7 +55,7 @@ def process_uploaded_images(image_paths, batch_by_category=False):
             path_mapping[str(temp_path)] = str(path)
             
         # Process the images using main.py's function
-        process_images(temp_input_dir, temp_output_dir, batch_images=batch_by_category)
+        process_images(temp_input_dir, temp_output_dir)
         
         # Collect the captions from the output directory
         captions = []
@@ -133,14 +133,14 @@ def update_caption_labels(image_paths):
             updates.append(gr.update(label=""))
     return updates
 
-def run_captioning(image_paths, batch_category):
+def run_captioning(image_paths):
     """Generate captions for the images using the main.py functions"""
     if not image_paths:
         return [gr.update(value="") for _ in range(MAX_IMAGES)] + [gr.update(value="No images to process")]
             
     try:
-        print(f"Starting captioning for {len(image_paths)} images, batch_by_category={batch_category}")
-        captions = process_uploaded_images(image_paths, batch_category)
+        print(f"Starting captioning for {len(image_paths)} images")
+        captions = process_uploaded_images(image_paths)
         
         # Count valid captions
         valid_captions = sum(1 for c in captions if c and c.strip())
@@ -170,10 +170,6 @@ def run_captioning(image_paths, batch_category):
     
     print(f"Returning {len(caption_updates)} caption updates")
     return caption_updates + [status]
-
-def update_batch_setting(value):
-    """Update the batch by category setting"""
-    return value
 
 def create_zip_from_ui(image_paths, *captions_list):
     """Create a zip file from the current images and captions in the UI"""
@@ -358,25 +354,13 @@ def create_config_area():
     with gr.Column(scale=1.5, elem_id="right-column") as config_column:
         # Configuration area
         gr.Markdown("### Configuration")
-        batch_category_checkbox = gr.Checkbox(
-            label="Batch process by category", 
-            value=False,
-            info="Caption similar images together"
-        )
-        
-        gr.Markdown("""
-        **Note about categorization:**
-        - Images are grouped by the part of the filename before the last underscore
-        - For example: "character_pose_1.png" and "character_pose_2.png" share the category "character_pose"
-        - When using "Batch process by category", similar images are captioned together for more consistent results
-        """, elem_classes=["category-info"])
         
         caption_btn = gr.Button("Caption Images", variant="primary", interactive=False)
         download_btn = gr.Button("Download Images + Captions", variant="secondary", interactive=False)
         download_output = gr.File(label="Download Zip", visible=False)
         status_text = gr.Markdown("Upload images to begin", visible=True)
     
-    return config_column, batch_category_checkbox, caption_btn, download_btn, download_output, status_text
+    return config_column, caption_btn, download_btn, download_output, status_text
 
 def create_captioning_area():
     """Create the captioning area components"""
@@ -423,7 +407,7 @@ def create_captioning_area():
 def setup_event_handlers(
     image_upload, stored_image_paths, captioning_area, caption_btn, download_btn, 
     download_output, status_text, image_rows, image_components, caption_components,
-    batch_category_checkbox, batch_by_category, shared_captions=None
+    shared_captions=None
 ):
     """Set up all event handlers for the UI"""
     # Combined outputs for the upload function
@@ -446,13 +430,6 @@ def setup_event_handlers(
         outputs=combined_outputs
     )
     
-    # Set up batch category checkbox
-    batch_category_checkbox.change(
-        update_batch_setting,
-        inputs=[batch_category_checkbox],
-        outputs=[batch_by_category]
-    )
-    
     # Set up captioning button chain
     caption_chain = caption_btn.click(
         on_captioning_start,
@@ -460,7 +437,7 @@ def setup_event_handlers(
         outputs=[status_text, caption_btn]
     ).success(
         run_captioning,
-        inputs=[stored_image_paths, batch_by_category],
+        inputs=[stored_image_paths],
         outputs=caption_components + [status_text]
     ).success(
         on_captioning_complete,
@@ -627,7 +604,6 @@ def build_ui():
             with gr.TabItem("Image Captioning") as captioning_tab:
                 # Store uploaded images
                 stored_image_paths = gr.State([])
-                batch_by_category = gr.State(False)  # State to track if batch by category is enabled
                 
                 # Create a two-column layout for the entire interface
                 with gr.Row():
@@ -635,7 +611,7 @@ def build_ui():
                     _, image_upload = create_upload_area()
                     
                     # Create config area in right column
-                    _, batch_category_checkbox, caption_btn, download_btn, download_output, status_text = create_config_area()
+                    _, caption_btn, download_btn, download_output, status_text = create_config_area()
                 
                 # Create captioning area (initially hidden)
                 captioning_area, image_rows, image_components, caption_components = create_captioning_area()
@@ -644,7 +620,7 @@ def build_ui():
                 setup_event_handlers(
                     image_upload, stored_image_paths, captioning_area, caption_btn, download_btn,
                     download_output, status_text, image_rows, image_components, caption_components,
-                    batch_category_checkbox, batch_by_category, shared_captions
+                    shared_captions
                 )
             
             with gr.TabItem("Prompt Optimization") as prompt_tab:
